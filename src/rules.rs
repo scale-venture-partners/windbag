@@ -61,6 +61,11 @@ pub fn check_block(file: &Path, block: &CommentBlock, config: &Config) -> Vec<Vi
             violations.push(v);
         }
     }
+    if config.hedge_language.enabled && !is_rule_suppressed(&block.text, "HEDGE_LANGUAGE") {
+        if let Some(v) = hedge_language_rule(&file_str, block, config) {
+            violations.push(v);
+        }
+    }
     if config.cross_file_ref.enabled && !is_rule_suppressed(&block.text, "CROSS_FILE_REF") {
         if let Some(v) = cross_file_ref_rule(&file_str, block) {
             violations.push(v);
@@ -91,6 +96,10 @@ fn ticket_id_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<V
         }
     }
 
+    if config.ticket_id.exempt_tracked_todos && precedes_with_todo_marker(&block.text, m.start()) {
+        return None;
+    }
+
     Some(Violation {
         file: file.to_string(),
         line: block.start_line,
@@ -105,13 +114,42 @@ fn ticket_id_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<V
     })
 }
 
+const TODO_MARKER_WINDOW: usize = 20;
+
+/// True if a `TODO`/`FIXME` marker appears in the `TODO_MARKER_WINDOW`
+/// characters immediately before a ticket-ID match — the shape of a
+/// forward-looking tracked task (`TODO(SCA-600): ...`, `FIXME: SCA-600 ...`)
+/// rather than the backward-narrating pattern TICKET_ID targets.
+fn precedes_with_todo_marker(text: &str, match_start: usize) -> bool {
+    let window_start = floor_char_boundary(text, match_start.saturating_sub(TODO_MARKER_WINDOW));
+    let window = text[window_start..match_start].to_lowercase();
+    window.contains("todo") || window.contains("fixme")
+}
+
+fn floor_char_boundary(s: &str, mut idx: usize) -> usize {
+    while idx > 0 && !s.is_char_boundary(idx) {
+        idx -= 1;
+    }
+    idx
+}
+
+/// Word-boundary-aware phrase match — a naive substring check let a
+/// first-person hedge phrase fire inside an unrelated identifier ending
+/// in the same two letters, found during calibration against real code.
+fn contains_phrase(lower_haystack: &str, phrase: &str) -> bool {
+    let pattern = format!(r"\b{}\b", regex::escape(phrase));
+    Regex::new(&pattern)
+        .map(|re| re.is_match(lower_haystack))
+        .unwrap_or(false)
+}
+
 fn history_narration_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<Violation> {
     let lower = block.text.to_lowercase();
     let phrase = config
         .history_narration
         .phrases
         .iter()
-        .find(|p| lower.contains(p.as_str()))?;
+        .find(|p| contains_phrase(&lower, p))?;
 
     Some(Violation {
         file: file.to_string(),
@@ -121,6 +159,28 @@ fn history_narration_rule(file: &str, block: &CommentBlock, config: &Config) -> 
         severity: Severity::Error,
         message: format!(
             "comment narrates the change (\"{}\") instead of the current state — describe the constraint, not the history",
+            phrase
+        ),
+        fixable: false,
+    })
+}
+
+fn hedge_language_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<Violation> {
+    let lower = block.text.to_lowercase();
+    let phrase = config
+        .hedge_language
+        .phrases
+        .iter()
+        .find(|p| contains_phrase(&lower, p))?;
+
+    Some(Violation {
+        file: file.to_string(),
+        line: block.start_line,
+        end_line: block.end_line,
+        rule: "HEDGE_LANGUAGE",
+        severity: Severity::Error,
+        message: format!(
+            "comment hedges (\"{}\") instead of stating a fact about the code — resolve the uncertainty or leave it out",
             phrase
         ),
         fixable: false,

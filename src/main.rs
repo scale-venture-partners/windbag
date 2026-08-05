@@ -74,8 +74,13 @@ enabled = true
 # Generic ticket-shape pattern. Narrow this to your own tracker's prefix
 # (e.g. '\bSCA-\d+\b') for higher precision.
 pattern = '\b[A-Z]{2,10}-\d{2,6}\b'
+# TODO(SCA-600)-style forward-looking tracked tasks are exempt by default.
+exempt_tracked_todos = true
 
 [windbag.history_narration]
+enabled = true
+
+[windbag.hedge_language]
 enabled = true
 
 [windbag.cross_file_ref]

@@ -243,3 +243,66 @@ x = 1
         violations
     );
 }
+
+#[test]
+fn hedge_language_fires_on_hedging_not_on_a_real_why_comment() {
+    let source = include_str!("fixtures/hedge_language.py");
+    let violations = violations_for(source, Language::Python);
+    let hedge_lines: Vec<usize> = violations
+        .iter()
+        .filter(|v| v.rule == "HEDGE_LANGUAGE")
+        .map(|v| v.line)
+        .collect();
+
+    assert!(
+        hedge_lines.contains(&2),
+        "expected the 'should work' / 'not sure why' comment to fire, got {:?}",
+        hedge_lines
+    );
+    assert!(
+        !hedge_lines.contains(&8),
+        "a comment stating a fact with 'because' should not be treated as hedging, got {:?}",
+        hedge_lines
+    );
+}
+
+/// TODO(TICKET)-style forward-looking tracked tasks are the opposite of
+/// the backward-narrating pattern TICKET_ID targets — Google's own style
+/// guide recommends exactly this convention.
+#[test]
+fn ticket_id_exempts_a_tracked_todo_but_not_a_narrating_ticket() {
+    let tracked_todo = "# TODO(SCA-600): revisit after Q3 pricing model ships\nx = 1\n";
+    let violations = violations_for(tracked_todo, Language::Python);
+    assert!(
+        violations.is_empty(),
+        "a tracked forward-looking TODO should not fire TICKET_ID, got {:#?}",
+        violations
+    );
+
+    let narrating = "# Was missing entirely (SCA-901): silently no-ops without this.\nx = 1\n";
+    let violations = violations_for(narrating, Language::Python);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "a backward-narrating ticket reference should still fire, got {:?}",
+        rules
+    );
+}
+
+#[test]
+fn ticket_id_todo_exemption_can_be_disabled() {
+    let mut config = Config::default();
+    config.ticket_id.exempt_tracked_todos = false;
+    let source = "# TODO(SCA-600): revisit after Q3 pricing model ships\nx = 1\n";
+    let blocks = extract_blocks(source, Language::Python).unwrap();
+    let violations: Vec<_> = blocks
+        .iter()
+        .flat_map(|b| check_block(Path::new("fixture"), b, &config))
+        .collect();
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "disabling exempt_tracked_todos should let TICKET_ID fire, got {:?}",
+        rules
+    );
+}

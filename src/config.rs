@@ -50,6 +50,36 @@ fn default_history_phrases() -> Vec<String> {
     ]
 }
 
+fn default_hedge_phrases() -> Vec<String> {
+    // "may or may not" deliberately excluded: calibration found it's
+    // mostly used for real data variability ("company may or may not
+    // have contacts"), not code-uncertainty hedging.
+    vec![
+        "should work".into(),
+        "hopefully".into(),
+        "probably fine".into(),
+        "probably works".into(),
+        "probably safe".into(),
+        "not sure why".into(),
+        "not sure if".into(),
+        "not sure this".into(),
+        "i think".into(),
+        "i believe".into(),
+        "as far as i can tell".into(),
+        "afaik".into(),
+        "seems to work".into(),
+        "should be fine".into(),
+        "should fix".into(),
+        "not 100% sure".into(),
+        "not entirely sure".into(),
+        "might not work".into(),
+        "for some reason".into(),
+        "no idea why".into(),
+        "in theory".into(),
+        "should be ok".into(),
+    ]
+}
+
 fn default_max_lines() -> usize {
     6
 }
@@ -64,6 +94,12 @@ pub struct TicketIdConfig {
     pub enabled: bool,
     pub pattern: String,
     pub exempt: Vec<String>,
+    /// A ticket ID inside a `TODO`/`FIXME` marker (`TODO(SCA-600): ...`,
+    /// `FIXME: SCA-600 ...`) is a forward-looking tracked task, not the
+    /// backward-narrating "this ticket explains why the code looks weird"
+    /// pattern this rule targets — HISTORY_NARRATION still catches it if
+    /// the TODO also narrates a past fix.
+    pub exempt_tracked_todos: bool,
 }
 
 impl Default for TicketIdConfig {
@@ -72,6 +108,7 @@ impl Default for TicketIdConfig {
             enabled: true,
             pattern: default_ticket_pattern(),
             exempt: default_ticket_exempt(),
+            exempt_tracked_todos: true,
         }
     }
 }
@@ -88,6 +125,22 @@ impl Default for HistoryNarrationConfig {
         Self {
             enabled: true,
             phrases: default_history_phrases(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct HedgeLanguageConfig {
+    pub enabled: bool,
+    pub phrases: Vec<String>,
+}
+
+impl Default for HedgeLanguageConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            phrases: default_hedge_phrases(),
         }
     }
 }
@@ -166,6 +219,8 @@ pub struct Config {
     pub ticket_id: TicketIdConfig,
     #[serde(rename = "history_narration")]
     pub history_narration: HistoryNarrationConfig,
+    #[serde(rename = "hedge_language")]
+    pub hedge_language: HedgeLanguageConfig,
     #[serde(rename = "cross_file_ref")]
     pub cross_file_ref: CrossFileRefConfig,
     #[serde(rename = "verbose_comment")]
@@ -180,6 +235,7 @@ impl Default for Config {
             exclude: default_exclude(),
             ticket_id: TicketIdConfig::default(),
             history_narration: HistoryNarrationConfig::default(),
+            hedge_language: HedgeLanguageConfig::default(),
             cross_file_ref: CrossFileRefConfig::default(),
             verbose_comment: VerboseCommentConfig::default(),
             obvious_comment: ObviousCommentConfig::default(),

@@ -28,11 +28,14 @@ windbag checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust. It's buil
 |---|---|---|
 | `TICKET_ID` | error | A ticket/issue ID (`SCA-533`, `JIRA-1234`, ...) inside a comment. Exempts security-advisory IDs (`CVE-`, `CWE-`, `GHSA-`, `AVD-`, ...) and tool-suppression directives (`trivy:ignore`, `# noqa`, `# nosec`, ...), which collide with a generic ticket-shape pattern in any real infra codebase. |
 | `HISTORY_NARRATION` | error | Phrases that narrate a change rather than describe current behavior: "was missing", "used to be", "no longer", "silently swallows", "root-caused", and similar. |
+| `HEDGE_LANGUAGE` | error | Phrases that signal unreviewed uncertainty rather than a stated fact: "should work", "hopefully", "not sure why", "i believe", "for some reason", and similar. All phrase matching (this rule and `HISTORY_NARRATION`) is word-boundary aware — "i believe" won't fire inside an unrelated identifier that happens to end the same way. |
 | `CROSS_FILE_REF` | warn | A pointer to another file/line/symbol (`handler.py:147`, `Class::method`). Often legitimate, sometimes a sign the real explanation lives somewhere else entirely (a PR description) and got summarized into a pointer instead. |
 | `VERBOSE_COMMENT` | warn | A comment block that's long — either in absolute lines, or relative to the single statement it's attached to. Docstrings, JSDoc, and Rust doc comments (`///`, `//!`, `/**`, `/*!`) are exempt from length; free-floating blocks (section headers, file banners) are exempt from the ratio, since there's no "attached code" to be disproportionate to. |
 | `OBVIOUS_COMMENT` | warn | A single-line comment that just restates the statement it's attached to — `// increment the counter` above `counter += 1`. Requires both a stock restatement verb (increment, return, call, loop, ...) and an identifier echoed from the code, and backs off the moment the comment contains real explanatory language ("because", "to avoid", "otherwise", ...). |
 
-`TICKET_ID` and `HISTORY_NARRATION` fail the check (non-zero exit). `CROSS_FILE_REF`, `VERBOSE_COMMENT`, and `OBVIOUS_COMMENT` are reported but don't block — they're corroborating signal, not independently reliable enough to gate a commit on.
+`TICKET_ID`, `HISTORY_NARRATION`, and `HEDGE_LANGUAGE` fail the check (non-zero exit). `CROSS_FILE_REF`, `VERBOSE_COMMENT`, and `OBVIOUS_COMMENT` are reported but don't block — they're corroborating signal, not independently reliable enough to gate a commit on.
+
+`TICKET_ID` exempts a ticket referenced inside a `TODO`/`FIXME` marker (`TODO(SCA-600): revisit after Q3 pricing model ships`) by default — that's a forward-looking tracked task, the opposite of the backward-narrating pattern this rule targets. `HISTORY_NARRATION` still fires if the TODO also narrates a past fix. Disable via `exempt_tracked_todos = false`.
 
 A short, non-obvious WHY comment — "sorted DESC because the caller assumes the first row is newest" — triggers nothing. That's the case this tool is designed to leave alone.
 
