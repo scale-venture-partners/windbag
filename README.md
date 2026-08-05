@@ -20,7 +20,7 @@ main.tf:218  warn  VERBOSE_COMMENT    comment block is long relative to what it
 
 Tools like [grain](https://github.com/mmartoccia/grain) and [sloppylint](https://github.com/rsionnach/sloppylint) catch AI-slop patterns in Python — bare excepts, mutable defaults, restated docstrings. Neither covers JS/TS or Terraform, and neither targets this specific pattern: a comment that reads like a changelog entry instead of documentation. It's an easy failure mode for an LLM to fall into (it just finished narrating the fix to you, so it writes that narration into the diff), and it's distinct from "comment restates the next line" — the comments this catches are often technically *true* and well-written. They're just in the wrong place.
 
-windbag checks Python, JavaScript/TypeScript, and Terraform/HCL. It's built to run as a pre-commit hook: by default it only looks at what a commit is actually introducing, not every pre-existing comment in a file that happened to get touched.
+windbag checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust. It's built to run as a pre-commit hook: by default it only looks at what a commit is actually introducing, not every pre-existing comment in a file that happened to get touched.
 
 ## What it detects
 
@@ -29,7 +29,7 @@ windbag checks Python, JavaScript/TypeScript, and Terraform/HCL. It's built to r
 | `TICKET_ID` | error | A ticket/issue ID (`SCA-533`, `JIRA-1234`, ...) inside a comment. Exempts security-advisory IDs (`CVE-`, `CWE-`, `GHSA-`, `AVD-`, ...) and tool-suppression directives (`trivy:ignore`, `# noqa`, `# nosec`, ...), which collide with a generic ticket-shape pattern in any real infra codebase. |
 | `HISTORY_NARRATION` | error | Phrases that narrate a change rather than describe current behavior: "was missing", "used to be", "no longer", "silently swallows", "root-caused", and similar. |
 | `CROSS_FILE_REF` | warn | A pointer to another file/line/symbol (`handler.py:147`, `Class::method`). Often legitimate, sometimes a sign the real explanation lives somewhere else entirely (a PR description) and got summarized into a pointer instead. |
-| `VERBOSE_COMMENT` | warn | A comment block that's long — either in absolute lines, or relative to the single statement it's attached to. Docstrings and JSDoc blocks are exempt from length; free-floating blocks (section headers, file banners) are exempt from the ratio, since there's no "attached code" to be disproportionate to. |
+| `VERBOSE_COMMENT` | warn | A comment block that's long — either in absolute lines, or relative to the single statement it's attached to. Docstrings, JSDoc, and Rust doc comments (`///`, `//!`, `/**`, `/*!`) are exempt from length; free-floating blocks (section headers, file banners) are exempt from the ratio, since there's no "attached code" to be disproportionate to. |
 
 `TICKET_ID` and `HISTORY_NARRATION` fail the check (non-zero exit). `CROSS_FILE_REF` and `VERBOSE_COMMENT` are reported but don't block — they're corroborating signal, not independently reliable enough to gate a commit on.
 

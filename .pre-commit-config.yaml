@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: windbag
+        name: windbag
+        description: Flags comments that narrate change history instead of a current constraint
+        entry: windbag check --staged
+        language: system
+        pass_filenames: false
+        types_or: [python, javascript, jsx, ts, tsx, terraform, rust]

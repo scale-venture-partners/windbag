@@ -1,0 +1,3 @@
+[windbag]
+# Test fixtures are deliberately full of the patterns this tool flags.
+exclude = ["tests/fixtures/*"]

@@ -123,7 +123,7 @@ fn history_narration_rule(file: &str, block: &CommentBlock, config: &Config) -> 
 
 fn cross_file_ref_rule(file: &str, block: &CommentBlock) -> Option<Violation> {
     let re =
-        Regex::new(r"[A-Za-z0-9_./-]+\.(py|tf|ts|js|jsx|tsx)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?")
+        Regex::new(r"[A-Za-z0-9_./-]+\.(py|tf|ts|js|jsx|tsx|rs)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?")
             .unwrap();
     let m = re.find(&block.text)?;
 

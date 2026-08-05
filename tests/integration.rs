@@ -115,6 +115,60 @@ fn jsdoc_slop_flags_content_rules_but_not_verbose_comment() {
 }
 
 #[test]
+fn rust_line_comment_flags_ticket_history_and_verbose() {
+    let source = include_str!("fixtures/rust_slop.rs");
+    let violations = violations_for(source, Language::Rust);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "expected TICKET_ID, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"HISTORY_NARRATION"),
+        "expected HISTORY_NARRATION, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"CROSS_FILE_REF"),
+        "expected CROSS_FILE_REF, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"VERBOSE_COMMENT"),
+        "expected VERBOSE_COMMENT, got {:?}",
+        rules
+    );
+}
+
+/// Rust's `///` doc comments are real `comment` nodes (unlike Python
+/// docstrings), so content rules still apply — but they must be exempt
+/// from the length/ratio rule, matching JSDoc.
+#[test]
+fn rust_doc_comment_flags_content_rules_but_not_verbose_comment() {
+    let source = include_str!("fixtures/rust_doc_slop.rs");
+    let violations = violations_for(source, Language::Rust);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "expected TICKET_ID, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"HISTORY_NARRATION"),
+        "expected HISTORY_NARRATION, got {:?}",
+        rules
+    );
+    assert!(
+        !rules.contains(&"VERBOSE_COMMENT"),
+        "Rust doc comments must be exempt from the length/ratio rule, got {:?}",
+        rules
+    );
+}
+
+#[test]
 fn inline_suppression_silences_a_specific_rule_only() {
     let source = "\
 # Was missing entirely (SCA-1): windbag: ignore[TICKET_ID]

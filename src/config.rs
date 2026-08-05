@@ -7,8 +7,8 @@ fn default_ticket_pattern() -> String {
 
 fn default_ticket_exempt() -> Vec<String> {
     // Collisions confirmed against real infra codebases during calibration:
-    // security-advisory IDs and tool-suppression directives all match a
-    // generic TICKET-123 shape but aren't project-tracker references.
+    // security-advisory IDs and tool-suppression directives all match the
+    // generic ticket-shape pattern above but aren't project-tracker references.
     vec![
         r"\b(CVE|CWE|GHSA|AVD|RFC|ISO|SHA)-\d+\b".to_string(),
         r"trivy:ignore".to_string(),
