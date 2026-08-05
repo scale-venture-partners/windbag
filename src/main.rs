@@ -85,6 +85,11 @@ enabled = true
 enabled = true
 max_lines = 6
 max_ratio = 2.0
+
+[windbag.obvious_comment]
+enabled = true
+max_words = 12
+min_match_ratio = 0.85
 "#;
 
 fn run_check(

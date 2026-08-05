@@ -122,6 +122,38 @@ impl Default for VerboseCommentConfig {
     }
 }
 
+fn default_max_words() -> usize {
+    12
+}
+
+fn default_min_match_ratio() -> f64 {
+    0.85
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct ObviousCommentConfig {
+    pub enabled: bool,
+    /// Comments longer than this are more likely a real explanation than
+    /// a pure restatement, and VERBOSE_COMMENT already covers overly long
+    /// comments — so this rule doesn't try to compete with it there.
+    pub max_words: usize,
+    /// Fraction of the comment's words that must be accounted for by a
+    /// stock restatement verb, a stopword, or an identifier echoed from
+    /// the attached code before this fires.
+    pub min_match_ratio: f64,
+}
+
+impl Default for ObviousCommentConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_words: default_max_words(),
+            min_match_ratio: default_min_match_ratio(),
+        }
+    }
+}
+
 fn default_exclude() -> Vec<String> {
     vec![]
 }
@@ -138,6 +170,8 @@ pub struct Config {
     pub cross_file_ref: CrossFileRefConfig,
     #[serde(rename = "verbose_comment")]
     pub verbose_comment: VerboseCommentConfig,
+    #[serde(rename = "obvious_comment")]
+    pub obvious_comment: ObviousCommentConfig,
 }
 
 impl Default for Config {
@@ -148,6 +182,7 @@ impl Default for Config {
             history_narration: HistoryNarrationConfig::default(),
             cross_file_ref: CrossFileRefConfig::default(),
             verbose_comment: VerboseCommentConfig::default(),
+            obvious_comment: ObviousCommentConfig::default(),
         }
     }
 }

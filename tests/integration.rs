@@ -168,6 +168,48 @@ fn rust_doc_comment_flags_content_rules_but_not_verbose_comment() {
     );
 }
 
+/// Exercises the four guards OBVIOUS_COMMENT relies on to stay
+/// low-noise: a clean restatement fires, a restatement-shaped comment
+/// with a "because" clause is treated as a real WHY, one with extra
+/// non-restatement content fails the match-ratio threshold, and a
+/// multi-line block is out of scope entirely (VERBOSE_COMMENT's territory).
+#[test]
+fn obvious_comment_fires_on_restatements_not_on_real_why_comments() {
+    let source = include_str!("fixtures/obvious_comment.rs");
+    let violations = violations_for(source, Language::Rust);
+    let obvious_lines: Vec<usize> = violations
+        .iter()
+        .filter(|v| v.rule == "OBVIOUS_COMMENT")
+        .map(|v| v.line)
+        .collect();
+
+    assert!(
+        obvious_lines.contains(&2),
+        "expected 'increment the counter' (line 2) to fire, got {:?}",
+        obvious_lines
+    );
+    assert!(
+        obvious_lines.contains(&5),
+        "expected 'return the count' (line 5) to fire, got {:?}",
+        obvious_lines
+    );
+    assert!(
+        !obvious_lines.contains(&8),
+        "a comment with a 'because' clause is a real WHY, got {:?}",
+        obvious_lines
+    );
+    assert!(
+        !obvious_lines.contains(&11),
+        "extra content beyond the restatement should fail the match ratio, got {:?}",
+        obvious_lines
+    );
+    assert!(
+        !obvious_lines.contains(&14),
+        "multi-line blocks are out of scope for this rule, got {:?}",
+        obvious_lines
+    );
+}
+
 #[test]
 fn inline_suppression_silences_a_specific_rule_only() {
     let source = "\

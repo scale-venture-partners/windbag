@@ -30,8 +30,9 @@ windbag checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust. It's buil
 | `HISTORY_NARRATION` | error | Phrases that narrate a change rather than describe current behavior: "was missing", "used to be", "no longer", "silently swallows", "root-caused", and similar. |
 | `CROSS_FILE_REF` | warn | A pointer to another file/line/symbol (`handler.py:147`, `Class::method`). Often legitimate, sometimes a sign the real explanation lives somewhere else entirely (a PR description) and got summarized into a pointer instead. |
 | `VERBOSE_COMMENT` | warn | A comment block that's long — either in absolute lines, or relative to the single statement it's attached to. Docstrings, JSDoc, and Rust doc comments (`///`, `//!`, `/**`, `/*!`) are exempt from length; free-floating blocks (section headers, file banners) are exempt from the ratio, since there's no "attached code" to be disproportionate to. |
+| `OBVIOUS_COMMENT` | warn | A single-line comment that just restates the statement it's attached to — `// increment the counter` above `counter += 1`. Requires both a stock restatement verb (increment, return, call, loop, ...) and an identifier echoed from the code, and backs off the moment the comment contains real explanatory language ("because", "to avoid", "otherwise", ...). |
 
-`TICKET_ID` and `HISTORY_NARRATION` fail the check (non-zero exit). `CROSS_FILE_REF` and `VERBOSE_COMMENT` are reported but don't block — they're corroborating signal, not independently reliable enough to gate a commit on.
+`TICKET_ID` and `HISTORY_NARRATION` fail the check (non-zero exit). `CROSS_FILE_REF`, `VERBOSE_COMMENT`, and `OBVIOUS_COMMENT` are reported but don't block — they're corroborating signal, not independently reliable enough to gate a commit on.
 
 A short, non-obvious WHY comment — "sorted DESC because the caller assumes the first row is newest" — triggers nothing. That's the case this tool is designed to leave alone.
 

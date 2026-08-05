@@ -2,6 +2,7 @@ use crate::comments::CommentBlock;
 use crate::config::Config;
 use regex::Regex;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -67,6 +68,11 @@ pub fn check_block(file: &Path, block: &CommentBlock, config: &Config) -> Vec<Vi
     }
     if config.verbose_comment.enabled && !is_rule_suppressed(&block.text, "VERBOSE_COMMENT") {
         if let Some(v) = verbose_comment_rule(&file_str, block, config) {
+            violations.push(v);
+        }
+    }
+    if config.obvious_comment.enabled && !is_rule_suppressed(&block.text, "OBVIOUS_COMMENT") {
+        if let Some(v) = obvious_comment_rule(&file_str, block, config) {
             violations.push(v);
         }
     }
@@ -180,4 +186,236 @@ fn verbose_comment_rule(file: &str, block: &CommentBlock, config: &Config) -> Op
         ),
         fixable: false,
     })
+}
+
+const STOCK_VERBS: &[&str] = &[
+    "increment",
+    "increments",
+    "decrement",
+    "decrements",
+    "initialize",
+    "initializes",
+    "init",
+    "declare",
+    "declares",
+    "define",
+    "defines",
+    "create",
+    "creates",
+    "creating",
+    "set",
+    "sets",
+    "setting",
+    "assign",
+    "assigns",
+    "assigning",
+    "update",
+    "updates",
+    "updating",
+    "return",
+    "returns",
+    "returning",
+    "call",
+    "calls",
+    "calling",
+    "invoke",
+    "invokes",
+    "check",
+    "checks",
+    "checking",
+    "loop",
+    "loops",
+    "looping",
+    "iterate",
+    "iterates",
+    "iterating",
+    "import",
+    "imports",
+    "importing",
+    "print",
+    "prints",
+    "printing",
+    "log",
+    "logs",
+    "logging",
+    "append",
+    "appends",
+    "appending",
+    "add",
+    "adds",
+    "adding",
+    "remove",
+    "removes",
+    "removing",
+    "delete",
+    "deletes",
+    "deleting",
+    "get",
+    "gets",
+    "getting",
+    "fetch",
+    "fetches",
+    "fetching",
+    "retrieve",
+    "retrieves",
+    "retrieving",
+    "open",
+    "opens",
+    "opening",
+    "close",
+    "closes",
+    "closing",
+];
+
+const STOPWORDS: &[&str] = &[
+    "the", "a", "an", "to", "of", "for", "this", "that", "on", "by", "in", "and", "it", "its",
+    "with", "from", "as", "is", "are", "our", "we",
+];
+
+/// Phrases that indicate the comment is explaining WHY rather than
+/// restating WHAT — legitimate even when short, so they veto this rule.
+const REASON_MARKERS: &[&str] = &[
+    "because",
+    "so that",
+    "in order to",
+    "to avoid",
+    "to prevent",
+    "otherwise",
+    "workaround",
+    "note:",
+    "warning:",
+    "important:",
+];
+
+fn obvious_comment_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<Violation> {
+    if block.is_doc_comment {
+        return None;
+    }
+    // Multi-line blocks are either a real explanation or already caught
+    // by VERBOSE_COMMENT — this rule targets the single-line "// increment
+    // the counter" case specifically.
+    if block.start_line != block.end_line {
+        return None;
+    }
+    if !(1..=2).contains(&block.attached_code_lines) {
+        return None;
+    }
+    let code_text = block.attached_code_text.as_ref()?;
+
+    let body = strip_comment_markers(&block.text);
+    let lower = body.to_lowercase();
+    if REASON_MARKERS.iter().any(|m| lower.contains(m)) {
+        return None;
+    }
+
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.is_empty() || words.len() > config.obvious_comment.max_words {
+        return None;
+    }
+
+    let code_words = identifier_words(code_text);
+    let mut has_verb = false;
+    let mut has_identifier_echo = false;
+    let mut significant = 0usize;
+    for w in &words {
+        if STOCK_VERBS.contains(w) {
+            has_verb = true;
+            significant += 1;
+        } else if STOPWORDS.contains(w) {
+            significant += 1;
+        } else if word_matches_identifier(w, &code_words) {
+            has_identifier_echo = true;
+            significant += 1;
+        }
+    }
+
+    // Require both a verb naming the action and an identifier echoed from
+    // the code: either alone is too weak a signal (e.g. "get the value"
+    // with no name, or a comment that just happens to mention a variable
+    // while explaining something else).
+    if !has_verb || !has_identifier_echo {
+        return None;
+    }
+    let ratio = significant as f64 / words.len() as f64;
+    if ratio < config.obvious_comment.min_match_ratio {
+        return None;
+    }
+
+    Some(Violation {
+        file: file.to_string(),
+        line: block.start_line,
+        end_line: block.end_line,
+        rule: "OBVIOUS_COMMENT",
+        severity: Severity::Warn,
+        message: "comment appears to just restate the line it's attached to — keep it only if it explains a non-obvious why".to_string(),
+        fixable: false,
+    })
+}
+
+fn strip_comment_markers(text: &str) -> String {
+    let t = text.trim();
+    let t = if let Some(rest) = t.strip_prefix("//") {
+        rest
+    } else if let Some(rest) = t.strip_prefix('#') {
+        rest
+    } else if let Some(rest) = t.strip_prefix("/*") {
+        rest.strip_suffix("*/").unwrap_or(rest)
+    } else {
+        t
+    };
+    t.trim().to_string()
+}
+
+fn identifier_words(code: &str) -> HashSet<String> {
+    let re = Regex::new(r"[A-Za-z_][A-Za-z0-9_]*").unwrap();
+    let mut out = HashSet::new();
+    for m in re.find_iter(code) {
+        for w in split_identifier(m.as_str()) {
+            if w.len() > 1 {
+                out.insert(w);
+            }
+        }
+    }
+    out
+}
+
+/// Splits a snake_case or camelCase identifier into lowercase words, so
+/// `page_counter` and `pageCounter` both yield ["page", "counter"].
+fn split_identifier(id: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut prev_lower = false;
+    for c in id.chars() {
+        if c == '_' {
+            if !current.is_empty() {
+                words.push(std::mem::take(&mut current));
+            }
+            prev_lower = false;
+            continue;
+        }
+        if c.is_uppercase() && prev_lower && !current.is_empty() {
+            words.push(std::mem::take(&mut current));
+        }
+        current.push(c.to_ascii_lowercase());
+        prev_lower = c.is_lowercase();
+    }
+    if !current.is_empty() {
+        words.push(current);
+    }
+    words
+}
+
+fn word_matches_identifier(word: &str, code_words: &HashSet<String>) -> bool {
+    if code_words.contains(word) {
+        return true;
+    }
+    if let Some(singular) = word.strip_suffix('s') {
+        if code_words.contains(singular) {
+            return true;
+        }
+    }
+    false
 }

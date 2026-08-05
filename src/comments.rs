@@ -16,6 +16,10 @@ pub struct CommentBlock {
     /// actual statement into enclosing closing braces/brackets, which
     /// dilutes the ratio for anything nested more than one level deep.
     pub attached_code_lines: usize,
+    /// Source text of the same attached sibling `attached_code_lines` is
+    /// measured from, when there is one. Used by rules that need to
+    /// compare what the comment says against what the code actually does.
+    pub attached_code_text: Option<String>,
     pub is_doc_comment: bool,
 }
 
@@ -65,7 +69,8 @@ pub fn extract_blocks(source: &str, language: Language) -> anyhow::Result<Vec<Co
                 break;
             }
         }
-        let attached_code_lines = attached_sibling_span(&last_node, end_row);
+        let (attached_code_lines, attached_code_text) =
+            attached_sibling_info(source, &last_node, end_row);
         let text = texts.join("\n");
         let is_doc_comment = language.is_doc_comment(&text);
         blocks.push(CommentBlock {
@@ -73,6 +78,7 @@ pub fn extract_blocks(source: &str, language: Language) -> anyhow::Result<Vec<Co
             end_line: end_row + 1,
             text,
             attached_code_lines,
+            attached_code_text,
             is_doc_comment,
         });
         i = j;
@@ -84,11 +90,16 @@ fn node_text(source: &str, node: &Node) -> String {
     source[node.byte_range()].to_string()
 }
 
-fn attached_sibling_span(last_comment_node: &Node, end_row: usize) -> usize {
+fn attached_sibling_info(
+    source: &str,
+    last_comment_node: &Node,
+    end_row: usize,
+) -> (usize, Option<String>) {
     match last_comment_node.next_sibling() {
         Some(sibling) if sibling.start_position().row == end_row + 1 => {
-            sibling.end_position().row - sibling.start_position().row + 1
+            let span = sibling.end_position().row - sibling.start_position().row + 1;
+            (span, Some(node_text(source, &sibling)))
         }
-        _ => 0,
+        _ => (0, None),
     }
 }
