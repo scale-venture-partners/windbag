@@ -1,0 +1,31 @@
+[package]
+name = "windbag"
+version = "0.1.0"
+edition = "2021"
+description = "Anti-slop linter: catches AI-generated comments that narrate change history instead of explaining a real constraint"
+license = "MIT"
+repository = "https://github.com/scalevp-investment-ops/windbag"
+
+[lib]
+name = "windbag"
+path = "src/lib.rs"
+
+[[bin]]
+name = "windbag"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+tree-sitter = "0.25"
+tree-sitter-python = "0.25"
+tree-sitter-javascript = "0.25"
+tree-sitter-typescript = "0.23"
+tree-sitter-hcl = "1.1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"

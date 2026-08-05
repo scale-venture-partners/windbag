@@ -1,0 +1,6 @@
+# Example config for ScaleVP repos: narrows the generic ticket-ID pattern
+# to our actual Linear team prefix for higher precision. Copy to
+# windbag.toml at the repo root and adjust as needed.
+
+[windbag.ticket_id]
+pattern = '\bSCA-\d+\b'
