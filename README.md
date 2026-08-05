@@ -102,6 +102,8 @@ Run windbag alongside grain/sloppylint if you're on Python — they check differ
 
 - **Distribution.** v0.1 requires a local Rust toolchain (`cargo install --path .`). A prebuilt-binary-in-a-wheel distribution (the [ruff](https://github.com/astral-sh/ruff) approach — `language: python` in `.pre-commit-hooks.yaml`, no toolchain required on the consumer's machine) is the plan before this goes further than internal use.
 - **Scope.** v0.1 is the comment-narration rule family only, on purpose — see [Why](#why). Broader AI-slop catalogs already exist for Python; this isn't trying to re-cover that ground.
+- **Config path is resolved relative to cwd, not repo root.** Fine under pre-commit (always runs from root); running `windbag check` manually from a subdirectory silently falls back to defaults instead of finding `windbag.toml`.
+- **`exclude` globs match the full relative path, anchored end-to-end.** `vendor/*` matches `vendor/x.py` but not `sub/vendor/x.py` — use `**/vendor/*` for a pattern that should match at any depth.
 
 ## License
 
