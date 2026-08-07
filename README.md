@@ -17,9 +17,20 @@ A pre-commit linter that catches comments narrating a change — a ticket number
 
 ## Install
 
+Needs a Rust toolchain. If you don't have one:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+. "$HOME/.cargo/env"    # and add this line to ~/.zshrc
+```
+
+Then, from a checkout:
+
 ```bash
 cargo install --path .
 ```
+
+That puts `windbag` in `~/.cargo/bin`, which must be on your `PATH`.
 
 ## Use
 
@@ -28,6 +39,7 @@ windbag init                  # write windbag.toml with generic defaults
 windbag check --staged        # check what's about to be committed
 windbag check --all           # check every git-tracked file in the repo
 windbag check --json --staged # machine-readable output
+windbag check --new-only f.py # only comments on lines the working tree adds over HEAD
 ```
 
 Pre-commit:
@@ -44,6 +56,68 @@ Pre-commit:
 ```
 
 (`windbag` needs to already be on `PATH` — `language: system` doesn't install it for you.)
+
+## Claude Code plugin
+
+Pre-commit catches slop after it's written. The plugin catches it as it's
+written: a `PostToolUse` hook runs `windbag` on every file Claude edits and
+exits non-zero on a violation, so the findings go straight back to Claude as a
+blocking error and it rewrites the comment before moving on. A `SessionStart`
+hook states the rules up front so most edits never trip the linter at all.
+
+```
+/plugin marketplace add scalevp-investment-ops/windbag
+/plugin install windbag@windbag
+```
+
+The binary has to be on `PATH` too — the plugin ships the hooks, not the linter,
+and they exit quietly when they can't find it. That means a Rust toolchain
+(see [Install](#install)) plus:
+
+```bash
+cargo install --git https://github.com/scalevp-investment-ops/windbag
+```
+
+TODO: publish prebuilt macOS binaries from a tagged release so installing this
+doesn't require a Rust toolchain. Fine while it's a couple of people; not fine
+as a team-wide ask.
+
+To turn it on for everyone working in a given repo, commit this to that repo's
+`.claude/settings.json`. Anyone who opens the repo is prompted to trust the
+marketplace, and the hooks apply from their next session:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "windbag": {
+      "source": { "source": "github", "repo": "scalevp-investment-ops/windbag" }
+    }
+  },
+  "enabledPlugins": { "windbag@windbag": true }
+}
+```
+
+Working on the plugin itself? `/plugin marketplace add /path/to/windbag` points
+at a local checkout instead. Either way the install copies [`plugin/`](plugin/)
+into `~/.claude/plugins/cache/` — keeping it out of the repo root is what keeps
+`target/` out of the copy. That copy is a snapshot: after editing a hook,
+reinstall to pick up the change.
+
+The hook needs `windbag` on `PATH` (or `WINDBAG_BIN` set) and `jq` installed;
+without either it exits quietly rather than breaking the session.
+
+| Env var | Effect |
+|---|---|
+| `WINDBAG_HOOK=off` | Disable both hooks without uninstalling. |
+| `WINDBAG_HOOK_LEVEL=error` | Block only on `error` rules; ignore warnings. |
+| `WINDBAG_BIN` | Explicit path to the binary. |
+
+Only comments on lines the working tree adds over `HEAD` are reported, so
+editing a file doesn't re-litigate comments that were already there. Claude is
+told not to silence a rule with `windbag: ignore` on its own — a false positive
+should surface to you, not get suppressed.
+
+`/windbag` sweeps the whole repo and fixes what it finds.
 
 Suppress a false positive inline:
 
