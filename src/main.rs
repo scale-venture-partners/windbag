@@ -30,6 +30,11 @@ enum Commands {
         /// Check every git-tracked file in the repo
         #[arg(long)]
         all: bool,
+        /// With explicit paths: report only comment blocks touching a line the
+        /// working tree adds on top of HEAD. Lets an editor-integration hook
+        /// flag what was just written without re-litigating the whole file.
+        #[arg(long, requires = "paths")]
+        new_only: bool,
         /// Emit machine-readable JSON instead of human-readable text
         #[arg(long)]
         json: bool,
@@ -48,9 +53,10 @@ fn main() -> anyhow::Result<()> {
             paths,
             staged,
             all,
+            new_only,
             json,
             config,
-        } => run_check(paths, staged, all, json, &config),
+        } => run_check(paths, staged, all, new_only, json, &config),
         Commands::Init => run_init(),
     }
 }
@@ -101,6 +107,7 @@ fn run_check(
     paths: Vec<PathBuf>,
     staged: bool,
     all: bool,
+    new_only: bool,
     json: bool,
     config_path: &Path,
 ) -> anyhow::Result<()> {
@@ -121,6 +128,15 @@ fn run_check(
     let mut violations = Vec::new();
 
     if !paths.is_empty() {
+        // A path outside any repo, or a repo-less directory, just means no
+        // baseline: every line is treated as new rather than erroring out.
+        let root = if new_only {
+            std::env::current_dir()
+                .ok()
+                .and_then(|d| git::repo_root(&d).ok())
+        } else {
+            None
+        };
         for path in &paths {
             if is_excluded(path, &exclude_patterns) {
                 continue;
@@ -129,7 +145,17 @@ fn run_check(
                 continue;
             };
             let source = std::fs::read_to_string(path)?;
-            violations.extend(check_source(path, &source, language, &config, None));
+            let added = match &root {
+                Some(root) => git::working_tree_added_lines(root, path).unwrap_or(None),
+                None => None,
+            };
+            violations.extend(check_source(
+                path,
+                &source,
+                language,
+                &config,
+                added.as_ref(),
+            ));
         }
     } else {
         let cwd = std::env::current_dir()?;

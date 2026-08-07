@@ -67,6 +67,30 @@ pub fn added_lines(repo_root: &Path, file: &Path) -> anyhow::Result<HashSet<usiz
     Ok(parse_added_lines(&out))
 }
 
+/// 1-indexed line numbers the working tree adds on top of `HEAD` for `file`,
+/// staged or not. `None` means "no baseline to diff against" — an untracked
+/// file is new in its entirety, and so is every line in it.
+pub fn working_tree_added_lines(
+    repo_root: &Path,
+    file: &Path,
+) -> anyhow::Result<Option<HashSet<usize>>> {
+    let spec = file.to_string_lossy().into_owned();
+    let tracked = Command::new("git")
+        .current_dir(repo_root)
+        .args(["ls-files", "--error-unmatch", "--", &spec])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !tracked {
+        return Ok(None);
+    }
+    let out = run(
+        repo_root,
+        &["diff", "HEAD", "-U0", "--no-color", "--", &spec],
+    )?;
+    Ok(Some(parse_added_lines(&out)))
+}
+
 fn parse_added_lines(diff: &str) -> HashSet<usize> {
     let mut lines = HashSet::new();
     let mut current: Option<usize> = None;

@@ -1,0 +1,13 @@
+{
+  "name": "windbag",
+  "owner": {
+    "name": "Harry Plumer"
+  },
+  "plugins": [
+    {
+      "name": "windbag",
+      "source": "./plugin",
+      "description": "Catches AI-slop comments as they are written, not at commit time."
+    }
+  ]
+}
