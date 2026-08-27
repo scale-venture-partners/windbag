@@ -1,1 +1,15 @@
 /target
+
+# Aristo runtime, cache, and per-user state: never commit these.
+# Durable state (.aristo/proofs/*.proof, .aristo/doc/, .aristo/specs/,
+# .aristo/feedback/, .aristo/expectations.toml, .aristo/canon-matches.toml,
+# aristo.toml) is committed and intentionally not listed here.
+.aristo/index.toml
+.aristo/catalogue.json
+.aristo/sessions/
+.aristo/nudge-state.toml
+.aristo/verify-queue/
+.aristo/critique-queue/
+.aristo/critiques/
+.aristo/proofs/*.proof.bak
+.aristo/archive/

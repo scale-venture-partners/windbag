@@ -91,6 +91,11 @@ pub fn working_tree_added_lines(
     Ok(Some(parse_added_lines(&out)))
 }
 
+#[aristo::intent(
+    "returns the 1-indexed line numbers of every `+` line in a unified diff, tracked via each hunk's `+start,count` header",
+    verify = "neural",
+    id = "windbag_diff_added_lines",
+)]
 fn parse_added_lines(diff: &str) -> HashSet<usize> {
     let mut lines = HashSet::new();
     let mut current: Option<usize> = None;

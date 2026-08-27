@@ -120,6 +120,11 @@ const TODO_MARKER_WINDOW: usize = 20;
 /// characters immediately before a ticket-ID match — the shape of a
 /// forward-looking tracked task (`TODO(SCA-600): ...`, `FIXME: SCA-600 ...`)
 /// rather than the backward-narrating pattern TICKET_ID targets.
+#[aristo::intent(
+    "true iff a forward-looking task-marker prefix appears, case-insensitively, within the fixed lookback window before match_start",
+    verify = "neural",
+    id = "windbag_todo_marker_window",
+)]
 fn precedes_with_todo_marker(text: &str, match_start: usize) -> bool {
     let window_start = floor_char_boundary(text, match_start.saturating_sub(TODO_MARKER_WINDOW));
     let window = text[window_start..match_start].to_lowercase();
@@ -136,6 +141,11 @@ fn floor_char_boundary(s: &str, mut idx: usize) -> usize {
 /// Word-boundary-aware phrase match — a naive substring check let a
 /// first-person hedge phrase fire inside an unrelated identifier ending
 /// in the same two letters, found during calibration against real code.
+#[aristo::intent(
+    "true iff phrase occurs in lower_haystack as a whole word (bounded by \\b), not as a substring of a longer token",
+    verify = "neural",
+    id = "windbag_phrase_word_boundary",
+)]
 fn contains_phrase(lower_haystack: &str, phrase: &str) -> bool {
     let pattern = format!(r"\b{}\b", regex::escape(phrase));
     Regex::new(&pattern)
