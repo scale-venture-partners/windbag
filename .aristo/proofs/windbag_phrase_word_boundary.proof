@@ -1,0 +1,24 @@
+[verdict]
+type = "verified"
+method = "neural"
+produced_at_text_hash = "sha256:f57c1794219f994158293202d66e0c3bcad655ba2db48b4d4c2d198b9c4273c0"
+produced_at_body_hash = "sha256:8815ac308ec917c2b5ac78be58e9e84cce70c487b26a45974a49de6d9cc2e2b3"
+produced_by = "claude-code-adhoc (no aristo-verify skill installed; CLI invoked directly)"
+verifier_model = "claude-sonnet-5"
+attempts = 1
+property_kind = "postcondition"
+
+[verified.proof]
+conclusion = 'contains_phrase returns true iff phrase matches lower_haystack as a whole word, i.e. bounded by \b on both sides, not merely as a substring.'
+
+[[verified.proof.steps]]
+path = "0"
+claim = 'the function builds the pattern \b<escaped phrase>\b via regex::escape (so regex metacharacters in phrase are treated literally) and returns whether that pattern matches lower_haystack; a construction failure (not expected for an escaped literal) degrades to false via unwrap_or(false) rather than panicking.'
+relation_to_parent = "decomposes"
+
+[[verified.proof.steps.grounds]]
+kind = "code"
+file = "src/rules.rs"
+lines = "149-154"
+code_text_hash = "sha256:bc7155748b1e9f97d198af5ad02ac77dad6c263ab5f4f7981b0b68e02cfc7c0b"
+reason = '''direct read of the function body: \b anchors on both sides of the escaped phrase are exactly what makes this word-boundary rather than substring matching, matching the claim's explicit contrast with a plain substring check.'''

@@ -1,0 +1,31 @@
+[verdict]
+type = "verified"
+method = "neural"
+produced_at_text_hash = "sha256:b2406c4f88af512e2fc5e511257525a43ae97419d0e42591526adaa38205db26"
+produced_at_body_hash = "sha256:abe8f8f05f5d8d9030e61cf02a5372754f136bf0822b5c97a64dc6fb8d789065"
+produced_by = "claude-code-adhoc (no aristo-verify skill installed; CLI invoked directly)"
+verifier_model = "claude-sonnet-5"
+attempts = 1
+property_kind = "postcondition"
+
+[verified.proof]
+conclusion = "parse_added_lines returns the set of 1-indexed line numbers of every line beginning with '+' in a unified diff (excluding the '+++' file-header line), computed by tracking a running line counter seeded from each hunk's '+start,count' header."
+
+[[verified.proof.steps]]
+path = "0"
+claim = "on a '@@ ' hunk header, current is set to the integer before the first ',' after the '+' in the header (defaulting to 0 on any parse failure); '+++' lines are skipped explicitly; every other line starting with '+' inserts the current counter into the result set and increments it."
+relation_to_parent = "decomposes"
+
+[[verified.proof.steps.grounds]]
+kind = "code"
+file = "src/git.rs"
+lines = "99-120"
+code_text_hash = "sha256:2be98f75112b43dbea133846a2b4e6f0c1f4b386b5069e67a539610183256f17"
+reason = "direct read of the function body confirms the hunk-header parse, the '+++' exclusion, and the insert-then-increment loop are the only paths that populate the returned HashSet."
+
+[[verified.proof.steps.grounds]]
+kind = "code"
+file = "src/git.rs"
+lines = "126-153"
+code_text_hash = "sha256:273b9f20d3639d50420346a5a2cdbe7fbdcf0aff886dcc678d6a8bc90c498d84"
+reason = "existing unit tests parses_simple_hunk and parses_multiple_hunks assert the exact output sets for representative single- and multi-hunk diffs, and both pass under cargo test."

@@ -1,0 +1,24 @@
+[verdict]
+type = "verified"
+method = "neural"
+produced_at_text_hash = "sha256:23c93b31e593b024023bb2d9d2ba7a4eeac233827fbd1ebc2331e0177694d759"
+produced_at_body_hash = "sha256:e3cb1cc717bfec404d12a175e8ce1b8eda9ad688518fc4389a9846764cc43b84"
+produced_by = "claude-code-adhoc (no aristo-verify skill installed; CLI invoked directly)"
+verifier_model = "claude-sonnet-5"
+attempts = 1
+property_kind = "postcondition"
+
+[verified.proof]
+conclusion = 'precedes_with_todo_marker returns true iff the case-insensitive substring "todo" or "fixme" occurs anywhere in the TODO_MARKER_WINDOW (20) characters immediately preceding match_start, char-boundary clamped.'
+
+[[verified.proof.steps]]
+path = "0"
+claim = 'window_start is match_start.saturating_sub(20) floored to a char boundary; window is text[window_start..match_start].to_lowercase(); the function returns window.contains("todo") || window.contains("fixme").'
+relation_to_parent = "decomposes"
+
+[[verified.proof.steps.grounds]]
+kind = "code"
+file = "src/rules.rs"
+lines = "128-132"
+code_text_hash = "sha256:1c4b6a9581a18a3c4ab0c296b28424c9115bc52bf09953596c7f35c379469c13"
+reason = "direct read of the function body: saturating_sub avoids underflow near the start of text, floor_char_boundary avoids slicing mid-codepoint, and the two contains() calls are the only source of the boolean result."
