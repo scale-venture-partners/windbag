@@ -189,9 +189,15 @@ fn hedge_language_rule(file: &str, block: &CommentBlock, config: &Config) -> Opt
 
 fn cross_file_ref_rule(file: &str, block: &CommentBlock) -> Option<Violation> {
     let re =
-        Regex::new(r"[A-Za-z0-9_./-]+\.(py|tf|ts|js|jsx|tsx|rs)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?")
+        Regex::new(
+            // Longest extension first: alternation is leftmost-first, so a
+            // shorter prefix listed earlier would truncate the reported path.
+            r"[A-Za-z0-9_./-]+\.(tfvars|yaml|html|jsx|tsx|hcl|htm|yml|py|tf|ts|js|rs|md)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?",
+        )
             .unwrap();
-    let m = re.find(&block.text)?;
+    let m = re
+        .find_iter(&block.text)
+        .find(|m| !is_inside_url(&block.text, m.start()))?;
 
     Some(Violation {
         file: file.to_string(),
@@ -207,8 +213,29 @@ fn cross_file_ref_rule(file: &str, block: &CommentBlock) -> Option<Violation> {
     })
 }
 
+/// True when a path-shaped match sits inside a URL. Documentation links
+/// ending in `.html`, `.md`, or a CDN script's `.js` are references to the
+/// wider world, not the in-repo pointers this rule is about.
+fn is_inside_url(text: &str, match_start: usize) -> bool {
+    // The whole whitespace-delimited token, not just what precedes the
+    // match: a path match inside `https://host/a.md` starts at the `//`,
+    // leaving only the scheme behind it.
+    let start = text[..match_start]
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_whitespace())
+        .map(|(i, c)| i + c.len_utf8())
+        .unwrap_or(0);
+    let end = text[match_start..]
+        .find(char::is_whitespace)
+        .map(|i| match_start + i)
+        .unwrap_or(text.len());
+    let token = &text[start..end];
+    token.contains("://") || token.contains("www.")
+}
+
 fn verbose_comment_rule(file: &str, block: &CommentBlock, config: &Config) -> Option<Violation> {
-    if block.is_doc_comment {
+    if block.is_doc_comment || block.is_markup {
         return None;
     }
     let line_count = block.end_line - block.start_line + 1;
@@ -423,6 +450,8 @@ fn strip_comment_markers(text: &str) -> String {
         rest
     } else if let Some(rest) = t.strip_prefix("/*") {
         rest.strip_suffix("*/").unwrap_or(rest)
+    } else if let Some(rest) = t.strip_prefix("<!--") {
+        rest.strip_suffix("-->").unwrap_or(rest)
     } else {
         t
     };

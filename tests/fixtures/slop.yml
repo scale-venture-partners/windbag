@@ -1,0 +1,4 @@
+# Was missing (SCA-533): the deploy step no longer fails without this.
+# Root-caused to a stale layer; see pipeline.yml:42 for the old shape.
+steps:
+  - checkout

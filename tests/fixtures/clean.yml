@@ -1,0 +1,13 @@
+# Pinned because the orb syntax below requires 2.1.
+version: 2.1
+
+jobs:
+  build:
+    # trivy:ignore AVD-DS-0002 — this image runs as root by design.
+    description: "a # b no longer works"
+    # The runner reuses one container across steps, so anything writing
+    # to $HOME leaks into later steps. Everything here stays under the
+    # workspace.
+    # See https://circleci.com/docs/2.0/Executor%20Reference.html
+    steps:
+      - checkout

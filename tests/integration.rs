@@ -306,3 +306,198 @@ fn ticket_id_todo_exemption_can_be_disabled() {
         rules
     );
 }
+
+#[test]
+fn yaml_comment_flags_ticket_history_and_cross_file_ref() {
+    let source = include_str!("fixtures/slop.yml");
+    let violations = violations_for(source, Language::Yaml);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "expected TICKET_ID, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"HISTORY_NARRATION"),
+        "expected HISTORY_NARRATION, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"CROSS_FILE_REF"),
+        "expected CROSS_FILE_REF, got {:?}",
+        rules
+    );
+}
+
+/// A `#` inside a quoted YAML scalar is data, not a comment — the reason
+/// this language goes through the grammar instead of a line scan.
+#[test]
+fn yaml_hash_inside_a_quoted_scalar_is_not_a_comment() {
+    let source = include_str!("fixtures/clean.yml");
+    let blocks = extract_blocks(source, Language::Yaml).unwrap();
+    assert!(
+        blocks.iter().all(|b| !b.text.contains("no longer works")),
+        "the quoted scalar was extracted as a comment: {:#?}",
+        blocks
+    );
+
+    let violations = violations_for(source, Language::Yaml);
+    assert!(
+        violations.is_empty(),
+        "expected zero violations on clean.yml, got {:#?}",
+        violations
+    );
+}
+
+#[test]
+fn html_comment_flags_ticket_and_history() {
+    let source = include_str!("fixtures/slop.html");
+    let violations = violations_for(source, Language::Html);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "expected TICKET_ID, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"HISTORY_NARRATION"),
+        "expected HISTORY_NARRATION, got {:?}",
+        rules
+    );
+}
+
+/// Markdown has no tree-sitter grammar wired up, so the scanner carries
+/// the whole burden of telling a real `<!-- -->` from one displayed as
+/// sample markup inside a fenced code block.
+#[test]
+fn markdown_flags_a_real_comment_but_not_one_inside_a_code_fence() {
+    let source = include_str!("fixtures/slop.md");
+    let blocks = extract_blocks(source, Language::Markdown).unwrap();
+    assert_eq!(
+        blocks.len(),
+        1,
+        "only the unfenced comment should be extracted, got {:#?}",
+        blocks
+    );
+    assert_eq!(blocks[0].start_line, 3);
+    assert_eq!(blocks[0].end_line, 3);
+
+    let violations = violations_for(source, Language::Markdown);
+    let rules: Vec<&str> = violations.iter().map(|v| v.rule).collect();
+    assert!(
+        rules.contains(&"TICKET_ID"),
+        "expected TICKET_ID, got {:?}",
+        rules
+    );
+    assert!(
+        rules.contains(&"HISTORY_NARRATION"),
+        "expected HISTORY_NARRATION, got {:?}",
+        rules
+    );
+    assert!(
+        violations.iter().all(|v| v.line == 3),
+        "the fenced comment must not be reported, got {:#?}",
+        violations
+    );
+}
+
+/// A multi-line comment keeps its true span, and two on consecutive lines
+/// read as one block — the same merge the tree-sitter path performs.
+#[test]
+fn markdown_spans_multiple_lines_and_merges_adjacent_comments() {
+    let source = "<!-- first\nstill first -->\n<!-- second -->\n\n<!-- separate -->\n";
+    let blocks = extract_blocks(source, Language::Markdown).unwrap();
+    assert_eq!(blocks.len(), 2, "got {:#?}", blocks);
+    assert_eq!((blocks[0].start_line, blocks[0].end_line), (1, 3));
+    assert_eq!((blocks[1].start_line, blocks[1].end_line), (5, 5));
+}
+
+/// Calibration against eight production repos found the length rule firing
+/// on the idiomatic config shape — a few lines of explanation above a
+/// one-line key — for 35 of 46 markup findings, while every real slop
+/// comment it sat on was already caught by a content rule.
+#[test]
+fn markup_is_exempt_from_the_length_rule_that_still_fires_on_code() {
+    let source = "# one\n# two\n# three\nkey = 1\n";
+
+    let python: Vec<&str> = violations_for(source, Language::Python)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(
+        python.contains(&"VERBOSE_COMMENT"),
+        "the same shape must still fire on code, got {:?}",
+        python
+    );
+
+    let yaml: Vec<&str> = violations_for(source, Language::Yaml)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(
+        !yaml.contains(&"VERBOSE_COMMENT"),
+        "markup must be exempt from the length rule, got {:?}",
+        yaml
+    );
+}
+
+/// A documentation link ending in `.html` or `.md` points at the wider
+/// world, not at a path in this repo that can rot.
+#[test]
+fn cross_file_ref_skips_a_url_but_still_flags_a_repo_path() {
+    let url = "# See https://circleci.com/docs/2.0/Executor%20Reference.html for the shape.\nversion: 2.1\n";
+    let rules: Vec<&str> = violations_for(url, Language::Yaml)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(
+        !rules.contains(&"CROSS_FILE_REF"),
+        "a documentation URL is not a repo pointer, got {:?}",
+        rules
+    );
+
+    // A URL with no character outside the path charset is the harder case:
+    // the path match starts at the `//`, leaving only `https:` behind it.
+    let plain = "# See https://example.com/docs/guide.md for the shape.\nversion: 2.1\n";
+    let rules: Vec<&str> = violations_for(plain, Language::Yaml)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(
+        !rules.contains(&"CROSS_FILE_REF"),
+        "a plain documentation URL is not a repo pointer, got {:?}",
+        rules
+    );
+
+    let path = "# Mirrors the bucket policy in modules/legacy/iam.tf.\nversion: 2.1\n";
+    let rules: Vec<&str> = violations_for(path, Language::Yaml)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(
+        rules.contains(&"CROSS_FILE_REF"),
+        "a real in-repo path must still fire, got {:?}",
+        rules
+    );
+}
+
+/// Documentation about Markdown names the comment marker in prose. Reading
+/// an unterminated `<!--` as a comment would run the phrase rules across
+/// every line after it, turning ordinary prose into blocking errors.
+#[test]
+fn markdown_ignores_an_unterminated_comment_marker() {
+    let source =
+        "Use the `<!--` marker to open a comment.\n\nThe exporter no longer runs nightly.\n";
+    let blocks = extract_blocks(source, Language::Markdown).unwrap();
+    assert!(
+        blocks.is_empty(),
+        "an unterminated marker is prose, got {:#?}",
+        blocks
+    );
+    assert!(
+        violations_for(source, Language::Markdown).is_empty(),
+        "prose after an unterminated marker must not be checked"
+    );
+}
