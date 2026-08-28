@@ -7,6 +7,9 @@ pub enum Language {
     TypeScript,
     Hcl,
     Rust,
+    Html,
+    Yaml,
+    Markdown,
 }
 
 impl Language {
@@ -17,17 +20,25 @@ impl Language {
             Some("ts") | Some("tsx") => Some(Language::TypeScript),
             Some("tf") | Some("tfvars") | Some("hcl") => Some(Language::Hcl),
             Some("rs") => Some(Language::Rust),
+            Some("html") | Some("htm") => Some(Language::Html),
+            Some("yml") | Some("yaml") => Some(Language::Yaml),
+            Some("md") | Some("markdown") => Some(Language::Markdown),
             _ => None,
         }
     }
 
-    pub fn ts_language(&self) -> tree_sitter::Language {
+    /// The tree-sitter grammar for this language, or `None` for one whose
+    /// comments are found by a hand-rolled scanner instead.
+    pub fn ts_language(&self) -> Option<tree_sitter::Language> {
         match self {
-            Language::Python => tree_sitter_python::LANGUAGE.into(),
-            Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
-            Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            Language::Hcl => tree_sitter_hcl::LANGUAGE.into(),
-            Language::Rust => tree_sitter_rust::LANGUAGE.into(),
+            Language::Python => Some(tree_sitter_python::LANGUAGE.into()),
+            Language::JavaScript => Some(tree_sitter_javascript::LANGUAGE.into()),
+            Language::TypeScript => Some(tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+            Language::Hcl => Some(tree_sitter_hcl::LANGUAGE.into()),
+            Language::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
+            Language::Html => Some(tree_sitter_html::LANGUAGE.into()),
+            Language::Yaml => Some(tree_sitter_yaml::LANGUAGE.into()),
+            Language::Markdown => None,
         }
     }
 
@@ -46,7 +57,18 @@ impl Language {
                     || trimmed.starts_with("/**")
                     || trimmed.starts_with("/*!")
             }
-            Language::Python | Language::Hcl => false,
+            Language::Python
+            | Language::Hcl
+            | Language::Html
+            | Language::Yaml
+            | Language::Markdown => false,
         }
+    }
+
+    /// Markup files carry prose and configuration rather than code. A
+    /// three-line comment above a one-line config key is idiomatic there,
+    /// so the length rule has no complexity budget to measure against.
+    pub fn is_markup(&self) -> bool {
+        matches!(self, Language::Html | Language::Yaml | Language::Markdown)
     }
 }

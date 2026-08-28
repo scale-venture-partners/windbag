@@ -1,6 +1,6 @@
 # windbag
 
-A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust.
+A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust, plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
 ## What it detects
 
@@ -9,11 +9,23 @@ A pre-commit linter that catches comments narrating a change — a ticket number
 | `TICKET_ID` | error | A ticket ID in a comment (`SCA-533`). Exempts `TODO(SCA-600)`-style tracked tasks and security-advisory IDs (`CVE-`, `GHSA-`, ...). |
 | `HISTORY_NARRATION` | error | "was missing", "used to be", "no longer", "silently swallows", and similar. |
 | `HEDGE_LANGUAGE` | error | "should work", "hopefully", "not sure why", "i believe", and similar. |
-| `CROSS_FILE_REF` | warn | A pointer to another file/line (`handler.py:147`). |
-| `VERBOSE_COMMENT` | warn | A comment that's long relative to what it documents. |
+| `CROSS_FILE_REF` | warn | A pointer to another file/line (`handler.py:147`). Documentation URLs are exempt. |
+| `VERBOSE_COMMENT` | warn | A comment that's long relative to what it documents. Markup files are exempt. |
 | `OBVIOUS_COMMENT` | warn | A comment that just restates the line below it (`// increment the counter` above `counter += 1`). |
 
 `error` rules fail the check; `warn` rules are reported but don't block.
+
+## Markup files
+
+YAML comments (`#`) come from the YAML grammar, so a `#` inside a quoted
+scalar stays data rather than becoming a comment. HTML and Markdown are
+checked through `<!-- ... -->`; in Markdown, anything inside a fenced code
+block is sample markup, not a comment, and is skipped.
+
+The content rules — `TICKET_ID`, `HISTORY_NARRATION`, `HEDGE_LANGUAGE`,
+`CROSS_FILE_REF` — carry the weight here. `VERBOSE_COMMENT` does not apply:
+a few lines of explanation above a one-line config key is the idiomatic
+shape in a config file, not a comment outgrowing its code.
 
 ## Install
 
@@ -52,7 +64,7 @@ Pre-commit:
       entry: windbag check --staged
       language: system
       pass_filenames: false
-      types_or: [python, javascript, jsx, ts, tsx, terraform, rust]
+      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html]
 ```
 
 (`windbag` needs to already be on `PATH` — `language: system` doesn't install it for you.)
@@ -157,6 +169,25 @@ schedule_followup()
 # Sorted DESC because the caller assumes the first row is newest.  <- clean, real WHY
 return sorted(items, reverse=True)
 ```
+
+```yaml
+# Was missing (SCA-533): the deploy no longer fails.  <- TICKET_ID, HISTORY_NARRATION
+steps:
+  - checkout
+
+# Pinned because the orb syntax below requires 2.1.   <- clean, real WHY
+version: 2.1
+```
+
+In Markdown, a comment shown as sample markup inside a fence is content:
+
+````markdown
+<!-- Was missing (SCA-533): renders wrong without it. -->   <- TICKET_ID, HISTORY_NARRATION
+
+```html
+<!-- Was missing (SCA-901): this one is an example. -->     <- clean, inside a fence
+```
+````
 
 ## License
 

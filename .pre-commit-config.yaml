@@ -7,4 +7,4 @@ repos:
         entry: windbag check --staged
         language: system
         pass_filenames: false
-        types_or: [python, javascript, jsx, ts, tsx, terraform, rust]
+        types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html]
