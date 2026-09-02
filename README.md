@@ -1,6 +1,6 @@
 # windbag
 
-A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, and Rust, plus the markup formats that carry comments: YAML, HTML, and Markdown.
+A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
 ## What it detects
 
@@ -26,6 +26,18 @@ The content rules — `TICKET_ID`, `HISTORY_NARRATION`, `HEDGE_LANGUAGE`,
 `CROSS_FILE_REF` — carry the weight here. `VERBOSE_COMMENT` does not apply:
 a few lines of explanation above a one-line config key is the idiomatic
 shape in a config file, not a comment outgrowing its code.
+
+## SQL files
+
+`.sql` files are read as Jinja-templated SQL, which is what dbt and SQLMesh
+models are. `--`, `/* */`, and Jinja `{# ... #}` comments are all checked. A
+marker inside a `'string'`, a `"quoted identifier"`, a `$$ ... $$` body, or a
+`{{ ... }}` / `{% ... %}` tag is data the template emits, not a comment. The
+scanner is dialect-agnostic, so Snowflake, Postgres, BigQuery, and the rest
+all work; MySQL-style `#` line comments are the one form it does not read.
+
+A comment is measured against the statement below it: the non-blank lines
+that follow, through the first one ending in `;`.
 
 ## Install
 
@@ -64,7 +76,7 @@ Pre-commit:
       entry: windbag check --staged
       language: system
       pass_filenames: false
-      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html]
+      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html, sql]
 ```
 
 (`windbag` needs to already be on `PATH` — `language: system` doesn't install it for you.)

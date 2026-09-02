@@ -45,7 +45,10 @@ pub fn extract_blocks(source: &str, language: Language) -> anyhow::Result<Vec<Co
         Some(ts_language) => extract_treesitter_blocks(source, &ts_language, language),
         // Markdown, whose `<!-- -->` shares an `html_block` node with
         // `<div>`/`<script>` in the grammar and needs a sharper separation.
-        None => Ok(scan_html_comments(source)),
+        None if language == Language::Markdown => Ok(scan_html_comments(source)),
+        // SQL, which in practice is a dbt or SQLMesh template that no SQL
+        // grammar parses cleanly.
+        None => Ok(crate::sql::scan_sql_comments(source)),
     }
 }
 
@@ -246,12 +249,12 @@ fn scan_html_comments(source: &str) -> Vec<CommentBlock> {
 }
 
 /// Byte offset to 1-indexed line number, over the sorted line starts.
-struct LineIndex {
+pub(crate) struct LineIndex {
     line_starts: Vec<usize>,
 }
 
 impl LineIndex {
-    fn new(source: &str) -> Self {
+    pub(crate) fn new(source: &str) -> Self {
         let mut line_starts = vec![0usize];
         for (i, b) in source.bytes().enumerate() {
             if b == b'\n' {
@@ -261,7 +264,7 @@ impl LineIndex {
         Self { line_starts }
     }
 
-    fn line(&self, offset: usize) -> usize {
+    pub(crate) fn line(&self, offset: usize) -> usize {
         match self.line_starts.binary_search(&offset) {
             Ok(i) => i + 1,
             Err(i) => i,
