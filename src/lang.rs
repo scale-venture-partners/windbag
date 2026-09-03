@@ -10,6 +10,7 @@ pub enum Language {
     Html,
     Yaml,
     Markdown,
+    Sql,
 }
 
 impl Language {
@@ -23,6 +24,7 @@ impl Language {
             Some("html") | Some("htm") => Some(Language::Html),
             Some("yml") | Some("yaml") => Some(Language::Yaml),
             Some("md") | Some("markdown") => Some(Language::Markdown),
+            Some("sql") => Some(Language::Sql),
             _ => None,
         }
     }
@@ -38,7 +40,7 @@ impl Language {
             Language::Rust => Some(tree_sitter_rust::LANGUAGE.into()),
             Language::Html => Some(tree_sitter_html::LANGUAGE.into()),
             Language::Yaml => Some(tree_sitter_yaml::LANGUAGE.into()),
-            Language::Markdown => None,
+            Language::Markdown | Language::Sql => None,
         }
     }
 
@@ -61,7 +63,8 @@ impl Language {
             | Language::Hcl
             | Language::Html
             | Language::Yaml
-            | Language::Markdown => false,
+            | Language::Markdown
+            | Language::Sql => false,
         }
     }
 

@@ -4,3 +4,4 @@ pub mod git;
 pub mod lang;
 pub mod output;
 pub mod rules;
+pub mod sql;

@@ -501,3 +501,123 @@ fn markdown_ignores_an_unterminated_comment_marker() {
         "prose after an unterminated marker must not be checked"
     );
 }
+
+#[test]
+fn sql_extension_maps_to_the_sql_language() {
+    assert_eq!(
+        Language::from_path(Path::new("models/x.sql")),
+        Some(Language::Sql)
+    );
+}
+
+/// dbt and SQLMesh models are Jinja-templated SQL: `--` and `/* */`
+/// comments sit next to `{# #}` Jinja comments, and all three carry the
+/// same kind of slop.
+#[test]
+fn sql_flags_slop_in_line_block_and_jinja_comments() {
+    let source = include_str!("fixtures/slop.sql");
+    let blocks = extract_blocks(source, Language::Sql).unwrap();
+    let lines: Vec<usize> = blocks.iter().map(|b| b.start_line).collect();
+    assert_eq!(lines, vec![3, 5, 18, 23], "got {:#?}", blocks);
+
+    let violations = violations_for(source, Language::Sql);
+    let at = |line: usize| -> Vec<&str> {
+        violations
+            .iter()
+            .filter(|v| v.line == line)
+            .map(|v| v.rule)
+            .collect()
+    };
+    for line in [3, 5] {
+        assert!(
+            at(line).contains(&"TICKET_ID"),
+            "line {line}: {:?}",
+            at(line)
+        );
+        assert!(
+            at(line).contains(&"HISTORY_NARRATION"),
+            "line {line}: {:?}",
+            at(line)
+        );
+    }
+    assert!(at(18).contains(&"HEDGE_LANGUAGE"), "line 18: {:?}", at(18));
+    assert!(
+        at(23).is_empty(),
+        "the real WHY comment must be clean, got {:?}",
+        at(23)
+    );
+}
+
+/// A `--` or `/* */` inside a string literal, or inside a `{{ }}` Jinja
+/// expression, is data the template emits, not a comment.
+#[test]
+fn sql_comment_markers_inside_strings_and_jinja_are_not_comments() {
+    let source = include_str!("fixtures/slop.sql");
+    let blocks = extract_blocks(source, Language::Sql).unwrap();
+    assert!(
+        blocks.iter().all(|b| !b.text.contains("not a comment")),
+        "a literal was extracted as a comment: {:#?}",
+        blocks
+    );
+
+    let dollar = "select $$ -- not a comment $$ as s;\n";
+    let blocks = extract_blocks(dollar, Language::Sql).unwrap();
+    assert!(blocks.is_empty(), "got {:#?}", blocks);
+
+    let escaped = "select 'it''s -- not a comment' as s;\n";
+    let blocks = extract_blocks(escaped, Language::Sql).unwrap();
+    assert!(blocks.is_empty(), "got {:#?}", blocks);
+}
+
+/// SQL has no braces to mislead a line scan, and a statement ends at a
+/// blank line or a `;`, so that is the code a comment is measured against.
+#[test]
+fn sql_attached_code_runs_to_a_blank_line_or_semicolon() {
+    let to_semicolon = "-- why\nselect 1\nfrom t\nwhere x = 1;\nselect 2\n";
+    let blocks = extract_blocks(to_semicolon, Language::Sql).unwrap();
+    assert_eq!(blocks.len(), 1, "got {:#?}", blocks);
+    assert_eq!(blocks[0].attached_code_lines, 3);
+    assert_eq!(
+        blocks[0].attached_code_text.as_deref(),
+        Some("select 1\nfrom t\nwhere x = 1;")
+    );
+
+    let to_blank = "-- why\nselect 1\nfrom t\n\nselect 2\n";
+    let blocks = extract_blocks(to_blank, Language::Sql).unwrap();
+    assert_eq!(blocks[0].attached_code_lines, 2);
+
+    let floating = "-- why\n\nselect 1\n";
+    let blocks = extract_blocks(floating, Language::Sql).unwrap();
+    assert_eq!(blocks[0].attached_code_lines, 0);
+    assert_eq!(blocks[0].attached_code_text, None);
+}
+
+/// SQL is code, not markup: the length rule and the restatement rule both
+/// apply, the way they do for Python.
+#[test]
+fn sql_is_subject_to_the_length_and_restatement_rules() {
+    let verbose = "-- one\n-- two\n-- three\nselect 1\n";
+    let rules: Vec<&str> = violations_for(verbose, Language::Sql)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(rules.contains(&"VERBOSE_COMMENT"), "got {:?}", rules);
+
+    let obvious = "-- create the users table\ncreate table users (id int)\n";
+    let rules: Vec<&str> = violations_for(obvious, Language::Sql)
+        .iter()
+        .map(|v| v.rule)
+        .collect();
+    assert!(rules.contains(&"OBVIOUS_COMMENT"), "got {:?}", rules);
+}
+
+/// A block comment keeps its true span, and adjacent comments of any
+/// flavor on consecutive lines merge into one block.
+#[test]
+fn sql_multiline_block_comment_merges_with_an_adjacent_line_comment() {
+    let source = "/* first\nstill first */\n-- second\n{# third #}\n\n-- separate\nselect 1\n";
+    let blocks = extract_blocks(source, Language::Sql).unwrap();
+    assert_eq!(blocks.len(), 2, "got {:#?}", blocks);
+    assert_eq!((blocks[0].start_line, blocks[0].end_line), (1, 4));
+    assert_eq!((blocks[1].start_line, blocks[1].end_line), (6, 6));
+}
