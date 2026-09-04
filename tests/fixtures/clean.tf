@@ -10,7 +10,7 @@ resource "aws_wafv2_web_acl" "main" {
   }
 }
 
-# svp-web-cache — VPC Lattice service-to-service connectivity (used by the agent worker)
+# VPC Lattice service-to-service connectivity for the cache tier
 resource "aws_vpc_lattice_service" "cache" {
   name = "cache"
 }

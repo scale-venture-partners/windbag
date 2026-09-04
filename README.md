@@ -90,7 +90,7 @@ blocking error and it rewrites the comment before moving on. A `SessionStart`
 hook states the rules up front so most edits never trip the linter at all.
 
 ```
-/plugin marketplace add scalevp-investment-ops/windbag
+/plugin marketplace add scale-venture-partners/windbag
 /plugin install windbag@windbag
 ```
 
@@ -99,7 +99,7 @@ and they exit quietly when they can't find it. That means a Rust toolchain
 (see [Install](#install)) plus:
 
 ```bash
-cargo install --git https://github.com/scalevp-investment-ops/windbag
+cargo install --git https://github.com/scale-venture-partners/windbag
 ```
 
 TODO: publish prebuilt macOS binaries from a tagged release so installing this
@@ -114,7 +114,7 @@ marketplace, and the hooks apply from their next session:
 {
   "extraKnownMarketplaces": {
     "windbag": {
-      "source": { "source": "github", "repo": "scalevp-investment-ops/windbag" }
+      "source": { "source": "github", "repo": "scale-venture-partners/windbag" }
     }
   },
   "enabledPlugins": { "windbag@windbag": true }
