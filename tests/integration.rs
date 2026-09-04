@@ -14,9 +14,9 @@ fn violations_for(source: &str, language: Language) -> Vec<windbag::rules::Viola
         .collect()
 }
 
-/// Paraphrase of the real pattern from scalevp-investment-ops/svp-infra-shared
-/// PR #308 that motivated this tool: a comment narrating a ticket number,
-/// the bug's prior-broken behavior, and a pointer into another file.
+/// Paraphrase of the pattern that motivated this tool: a comment narrating
+/// a ticket number, the bug's prior-broken behavior, and a pointer into
+/// another file.
 #[test]
 fn flags_ticket_history_and_cross_file_ref_together() {
     let source = include_str!("fixtures/slop.tf");
