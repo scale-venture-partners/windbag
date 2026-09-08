@@ -56,6 +56,20 @@ cargo install --path .
 
 That puts `windbag` in `~/.cargo/bin`, which must be on your `PATH`.
 
+Without wanting `windbag` on `PATH` permanently: this repo also builds as a
+Python package via [maturin](https://www.maturin.rs)'s `bindings = "bin"`
+mode, which just wraps the compiled binary in a wheel — there's no Python
+code here, and `import windbag` doesn't work. From a checkout with a Rust
+toolchain and [uv](https://docs.astral.sh/uv/):
+
+```bash
+uvx maturin build --release
+uvx --from target/wheels/windbag-*.whl windbag check --all
+```
+
+No package is published yet, so this only works from a local build for now
+— `uvx windbag` (pulling from an index) isn't available.
+
 ## Use
 
 ```bash
