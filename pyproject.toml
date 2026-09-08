@@ -1,0 +1,18 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "windbag"
+version = "0.1.0"
+description = "Catches comments that narrate a change instead of documenting a real constraint"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+
+[project.urls]
+Repository = "https://github.com/scale-venture-partners/windbag"
+
+[tool.maturin]
+bindings = "bin"
+strip = true
