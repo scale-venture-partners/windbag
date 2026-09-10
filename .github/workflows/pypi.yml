@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: PyO3/maturin-action@v1
+        env:
+          CFLAGS: -D_GNU_SOURCE
         with:
           target: ${{ matrix.target }}
           args: --release --out dist
