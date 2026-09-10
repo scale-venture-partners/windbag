@@ -119,16 +119,14 @@ hook states the rules up front so most edits never trip the linter at all.
 /plugin install windbag@windbag
 ```
 
-The binary has to be on `PATH` too — the plugin ships the hooks, not the linter,
-and they exit quietly when they can't find it:
-
-```bash
-uv tool install windbag
-# or
-pip install windbag
-```
-
-(see [Install](#install) for building from source instead.)
+The plugin ships the hooks, not the linter, so the binary also has to be on
+`PATH`. The `SessionStart` hook installs it automatically on first use, via
+whichever of `uv tool install windbag`, `pipx install windbag`, or
+`pip install --user windbag` it finds first; if none of those are on `PATH`
+either, it exits quietly and the `PostToolUse` hook stays a no-op until
+`windbag` shows up some other way. To install it yourself instead — a
+locked-down machine with no package-manager network access, say — see
+[Install](#install).
 
 To turn it on for everyone working in a given repo, commit this to that repo's
 `.claude/settings.json`. Anyone who opens the repo is prompted to trust the

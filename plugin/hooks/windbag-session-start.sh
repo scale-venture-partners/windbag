@@ -6,6 +6,19 @@ set -uo pipefail
 
 [[ "${WINDBAG_HOOK:-on}" == "off" ]] && exit 0
 
+# First session after installing the plugin: the hooks are in place but the
+# linter binary isn't. Bootstrap it once so windbag works without a separate
+# manual install step.
+if [[ -z "${WINDBAG_BIN:-}" ]] && ! command -v windbag >/dev/null 2>&1; then
+  if command -v uv >/dev/null 2>&1; then
+    uv tool install --quiet windbag >/dev/null 2>&1
+  elif command -v pipx >/dev/null 2>&1; then
+    pipx install --quiet windbag >/dev/null 2>&1
+  elif command -v pip >/dev/null 2>&1; then
+    pip install --user --quiet windbag >/dev/null 2>&1
+  fi
+fi
+
 read -r -d '' context <<'EOF'
 This project lints comments with `windbag`, and a PostToolUse hook will block
 your edits when it finds a violation. Write comments accordingly:
