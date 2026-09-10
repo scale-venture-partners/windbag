@@ -1,6 +1,6 @@
 [package]
 name = "windbag"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Anti-slop linter: catches AI-generated comments that narrate change history instead of explaining a real constraint"
 license = "MIT"
