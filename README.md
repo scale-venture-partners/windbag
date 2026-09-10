@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/windbag.svg)](https://pypi.org/project/windbag/)
 
-A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
+A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting the constraint that makes the current code correct. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
 ## What it detects
 

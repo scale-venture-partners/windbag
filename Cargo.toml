@@ -2,7 +2,7 @@
 name = "windbag"
 version = "0.1.1"
 edition = "2021"
-description = "Anti-slop linter: catches AI-generated comments that narrate change history instead of explaining a real constraint"
+description = "Anti-slop linter: catches comments that narrate a change instead of documenting the constraint that makes the current code correct"
 license = "MIT"
 repository = "https://github.com/scale-venture-partners/windbag"
 

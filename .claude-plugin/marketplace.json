@@ -7,7 +7,7 @@
     {
       "name": "windbag",
       "source": "./plugin",
-      "description": "Catches AI-slop comments as they are written, not at commit time."
+      "description": "Catches comments that narrate a change instead of documenting the constraint that makes the current code correct — as they're written, not at commit time."
     }
   ]
 }

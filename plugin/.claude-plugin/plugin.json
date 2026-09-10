@@ -1,6 +1,6 @@
 {
   "name": "windbag",
-  "description": "Blocks Claude Code from writing comments that narrate a change instead of documenting a constraint. Runs windbag on every file Claude edits and hands the violations back for an immediate rewrite.",
+  "description": "Blocks Claude Code from writing comments that narrate a change instead of documenting the constraint that makes the current code correct. Runs windbag on every file Claude edits and hands the violations back for an immediate rewrite.",
   "version": "0.1.1",
   "author": {
     "name": "Harry Plumer"

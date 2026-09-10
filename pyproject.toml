@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "windbag"
 version = "0.1.1"
-description = "Catches comments that narrate a change instead of documenting a real constraint"
+description = "Anti-slop linter: catches comments that narrate a change instead of documenting the constraint that makes the current code correct"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
