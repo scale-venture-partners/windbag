@@ -1,5 +1,7 @@
 # windbag
 
+[![PyPI](https://img.shields.io/pypi/v/windbag.svg)](https://pypi.org/project/windbag/)
+
 A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting why the current code is the way it is. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
 ## What it detects
@@ -41,7 +43,22 @@ that follow, through the first one ending in `;`.
 
 ## Install
 
-Needs a Rust toolchain. If you don't have one:
+From [PyPI](https://pypi.org/project/windbag/) — prebuilt wheels for macOS,
+Linux, and Windows, no Rust toolchain required:
+
+```bash
+pip install windbag
+# or
+uv tool install windbag
+```
+
+Run it without installing anything:
+
+```bash
+uvx windbag check --all
+```
+
+Building from source instead needs a Rust toolchain. If you don't have one:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -54,21 +71,15 @@ Then, from a checkout:
 cargo install --path .
 ```
 
-That puts `windbag` in `~/.cargo/bin`, which must be on your `PATH`.
-
-Without wanting `windbag` on `PATH` permanently: this repo also builds as a
-Python package via [maturin](https://www.maturin.rs)'s `bindings = "bin"`
-mode, which just wraps the compiled binary in a wheel — there's no Python
-code here, and `import windbag` doesn't work. From a checkout with a Rust
-toolchain and [uv](https://docs.astral.sh/uv/):
+That puts `windbag` in `~/.cargo/bin`, which must be on your `PATH`. This
+repo builds as a Python wheel via [maturin](https://www.maturin.rs)'s
+`bindings = "bin"` mode, which just wraps the compiled binary — there's no
+Python code here, and `import windbag` doesn't work:
 
 ```bash
 uvx maturin build --release
 uvx --from target/wheels/windbag-*.whl windbag check --all
 ```
-
-No package is published yet, so this only works from a local build for now
-— `uvx windbag` (pulling from an index) isn't available.
 
 ## Use
 
@@ -109,16 +120,15 @@ hook states the rules up front so most edits never trip the linter at all.
 ```
 
 The binary has to be on `PATH` too — the plugin ships the hooks, not the linter,
-and they exit quietly when they can't find it. That means a Rust toolchain
-(see [Install](#install)) plus:
+and they exit quietly when they can't find it:
 
 ```bash
-cargo install --git https://github.com/scale-venture-partners/windbag
+uv tool install windbag
+# or
+pip install windbag
 ```
 
-TODO: publish prebuilt macOS binaries from a tagged release so installing this
-doesn't require a Rust toolchain. Fine while it's a couple of people; not fine
-as a team-wide ask.
+(see [Install](#install) for building from source instead.)
 
 To turn it on for everyone working in a given repo, commit this to that repo's
 `.claude/settings.json`. Anyone who opens the repo is prompted to trust the
