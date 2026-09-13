@@ -192,7 +192,7 @@ fn cross_file_ref_rule(file: &str, block: &CommentBlock) -> Option<Violation> {
         Regex::new(
             // Longest extension first: alternation is leftmost-first, so a
             // shorter prefix listed earlier would truncate the reported path.
-            r"[A-Za-z0-9_./-]+\.(tfvars|yaml|html|jsx|tsx|hcl|htm|yml|py|tf|ts|js|rs|md)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?",
+            r"[A-Za-z0-9_./-]+\.(tfvars|yaml|html|java|jsx|tsx|hcl|htm|yml|py|tf|ts|js|rs|md|go)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?",
         )
             .unwrap();
     let m = re
