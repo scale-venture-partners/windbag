@@ -29,6 +29,8 @@ toml = "0.8"
 anyhow = "1"
 tree-sitter-html = "0.23"
 tree-sitter-yaml = "0.7"
+tree-sitter-go = "0.25.0"
+tree-sitter-java = "0.23.5"
 
 [dev-dependencies]
 tempfile = "3"
