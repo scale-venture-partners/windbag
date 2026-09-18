@@ -1,6 +1,8 @@
 # windbag
 
 [![PyPI](https://img.shields.io/pypi/v/windbag.svg)](https://pypi.org/project/windbag/)
+[![CI](https://github.com/scale-venture-partners/windbag/actions/workflows/ci.yml/badge.svg)](https://github.com/scale-venture-partners/windbag/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-00C756.svg)](LICENSE)
 
 A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting the constraint that makes the current code correct. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
@@ -225,4 +227,15 @@ In Markdown, a comment shown as sample markup inside a fence is content:
 
 ## License
 
-MIT
+[MIT](LICENSE) © Scale Venture Partners.
+
+## About Scale Venture Partners
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/scale-logo-dark.png">
+  <img alt="Scale Venture Partners" src="assets/scale-logo-light.png" width="160">
+</picture>
+
+**We back the few who can go the distance.** Scale Venture Partners partners
+with early-stage AI companies on the journey from founder-led growth to a
+go-to-market machine. [scalevp.com](https://www.scalevp.com)
