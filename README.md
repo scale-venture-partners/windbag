@@ -4,7 +4,7 @@
 [![CI](https://github.com/scale-venture-partners/windbag/actions/workflows/ci.yml/badge.svg)](https://github.com/scale-venture-partners/windbag/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00C756.svg)](LICENSE)
 
-A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting the constraint that makes the current code correct. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
+A pre-commit linter that catches comments narrating a change — a ticket number, what the code used to do, hedging about whether it works — instead of documenting the constraint that makes the current code correct. Checks Python, JavaScript/TypeScript, Terraform/HCL, Rust, Go, Java, and SQL (including dbt and SQLMesh templates), plus the markup formats that carry comments: YAML, HTML, and Markdown.
 
 ## What it detects
 
@@ -93,6 +93,10 @@ windbag check --json --staged # machine-readable output
 windbag check --new-only f.py # only comments on lines the working tree adds over HEAD
 ```
 
+When run interactively, bulk `--all` and `--staged` checks show progress on
+stderr. Progress is suppressed for `--json`, CI, hooks, and other non-terminal
+callers so their output remains machine-readable.
+
 Pre-commit:
 
 ```yaml
@@ -103,7 +107,7 @@ Pre-commit:
       entry: windbag check --staged
       language: system
       pass_filenames: false
-      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html, sql]
+      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html, sql, golang, java]
 ```
 
 (`windbag` needs to already be on `PATH` — `language: system` doesn't install it for you.)

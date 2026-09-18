@@ -510,6 +510,73 @@ fn sql_extension_maps_to_the_sql_language() {
     );
 }
 
+#[test]
+fn go_and_java_extensions_map_to_their_languages() {
+    assert_eq!(
+        Language::from_path(Path::new("internal/auth.go")),
+        Some(Language::Go)
+    );
+    assert_eq!(
+        Language::from_path(Path::new("src/main/java/App.java")),
+        Some(Language::Java)
+    );
+}
+
+#[test]
+fn go_and_java_comments_are_checked() {
+    for (language, source) in [
+        (Language::Go, include_str!("fixtures/slop.go")),
+        (Language::Java, include_str!("fixtures/slop.java")),
+    ] {
+        let rules: Vec<&str> = violations_for(source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+        assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+        assert!(rules.contains(&"CROSS_FILE_REF"), "got {rules:?}");
+    }
+}
+
+#[test]
+fn javadoc_is_exempt_from_verbose_comment_but_not_content_rules() {
+    let source = include_str!("fixtures/javadoc_slop.java");
+    let rules: Vec<&str> = violations_for(source, Language::Java)
+        .iter()
+        .map(|violation| violation.rule)
+        .collect();
+    assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+    assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+    assert!(!rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
+}
+
+/// Go has no doc-comment marker: a `//` block above a declaration is
+/// documentation by position, matching Rust's `///` exemption.
+#[test]
+fn godoc_is_exempt_from_verbose_comment_but_not_content_rules() {
+    let source = include_str!("fixtures/godoc_slop.go");
+    let rules: Vec<&str> = violations_for(source, Language::Go)
+        .iter()
+        .map(|violation| violation.rule)
+        .collect();
+    assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+    assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+    assert!(!rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
+}
+
+/// The same `//` block loses its exemption once it sits above a
+/// statement instead of a declaration — adjacency to a declaration is
+/// exactly the signal, not the `//` marker itself.
+#[test]
+fn go_comment_not_attached_to_a_declaration_flags_verbose_comment() {
+    let source = include_str!("fixtures/go_inline_slop.go");
+    let rules: Vec<&str> = violations_for(source, Language::Go)
+        .iter()
+        .map(|violation| violation.rule)
+        .collect();
+    assert!(rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
+}
+
 /// dbt and SQLMesh models are Jinja-templated SQL: `--` and `/* */`
 /// comments sit next to `{# #}` Jinja comments, and all three carry the
 /// same kind of slop.

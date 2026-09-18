@@ -11,6 +11,8 @@ pub enum Language {
     Yaml,
     Markdown,
     Sql,
+    Go,
+    Java,
 }
 
 impl Language {
@@ -25,6 +27,8 @@ impl Language {
             Some("yml") | Some("yaml") => Some(Language::Yaml),
             Some("md") | Some("markdown") => Some(Language::Markdown),
             Some("sql") => Some(Language::Sql),
+            Some("go") => Some(Language::Go),
+            Some("java") => Some(Language::Java),
             _ => None,
         }
     }
@@ -41,18 +45,24 @@ impl Language {
             Language::Html => Some(tree_sitter_html::LANGUAGE.into()),
             Language::Yaml => Some(tree_sitter_yaml::LANGUAGE.into()),
             Language::Markdown | Language::Sql => None,
+            Language::Go => Some(tree_sitter_go::LANGUAGE.into()),
+            Language::Java => Some(tree_sitter_java::LANGUAGE.into()),
         }
     }
 
-    /// Comment-block prefixes that mark real documentation (JSDoc, Rust's
+    /// Comment-block prefixes that mark real documentation (JSDoc/Javadoc, Rust's
     /// `///`/`//!`/`/**`/`/*!`), exempt from the verbose-comment length
     /// rule the same way Python docstrings are exempt (docstrings aren't
     /// `comment` nodes at all in tree-sitter's Python grammar, so they
-    /// never reach this check in the first place).
+    /// never reach this check in the first place). Go has no such prefix;
+    /// its doc comments are recognized structurally instead, by adjacency
+    /// to a declaration.
     pub fn is_doc_comment(&self, text: &str) -> bool {
         let trimmed = text.trim_start();
         match self {
-            Language::JavaScript | Language::TypeScript => trimmed.starts_with("/**"),
+            Language::JavaScript | Language::TypeScript | Language::Java => {
+                trimmed.starts_with("/**")
+            }
             Language::Rust => {
                 trimmed.starts_with("///")
                     || trimmed.starts_with("//!")
@@ -64,7 +74,8 @@ impl Language {
             | Language::Html
             | Language::Yaml
             | Language::Markdown
-            | Language::Sql => false,
+            | Language::Sql
+            | Language::Go => false,
         }
     }
 

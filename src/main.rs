@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
+use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use windbag::config::Config;
 use windbag::lang::Language;
@@ -162,16 +164,19 @@ fn run_check(
         let root = git::repo_root(&cwd)?;
 
         if staged {
-            for rel_path in git::staged_files(&root)? {
-                if is_excluded(&rel_path, &exclude_patterns) {
-                    continue;
-                }
-                let Some(language) = Language::from_path(&rel_path) else {
-                    continue;
-                };
+            let files: Vec<_> = git::staged_files(&root)?
+                .into_iter()
+                .filter(|path| !is_excluded(path, &exclude_patterns))
+                .filter_map(|path| Language::from_path(&path).map(|language| (path, language)))
+                .collect();
+            let progress = progress_bar(files.len(), !json);
+            for (rel_path, language) in files {
                 let source = match git::staged_content(&root, &rel_path) {
-                    Ok(s) => s,
-                    Err(_) => continue, // e.g. deleted-then-staged edge cases
+                    Ok(source) => source,
+                    Err(_) => {
+                        progress.inc(1);
+                        continue; // e.g. deleted-then-staged edge cases
+                    }
                 };
                 let added = git::added_lines(&root, &rel_path)?;
                 violations.extend(check_source(
@@ -181,22 +186,27 @@ fn run_check(
                     &config,
                     Some(&added),
                 ));
+                progress.inc(1);
             }
+            progress.finish_with_message("checked staged files");
         } else {
             debug_assert!(all);
-            for rel_path in git::all_files(&root)? {
-                if is_excluded(&rel_path, &exclude_patterns) {
-                    continue;
-                }
-                let Some(language) = Language::from_path(&rel_path) else {
-                    continue;
-                };
+            let files: Vec<_> = git::all_files(&root)?
+                .into_iter()
+                .filter(|path| !is_excluded(path, &exclude_patterns))
+                .filter_map(|path| Language::from_path(&path).map(|language| (path, language)))
+                .collect();
+            let progress = progress_bar(files.len(), !json);
+            for (rel_path, language) in files {
                 let full_path = root.join(&rel_path);
                 let Ok(source) = std::fs::read_to_string(&full_path) else {
+                    progress.inc(1);
                     continue; // binary or non-UTF8 file
                 };
                 violations.extend(check_source(&rel_path, &source, language, &config, None));
+                progress.inc(1);
             }
+            progress.finish_with_message("checked files");
         }
     }
 
@@ -211,6 +221,25 @@ fn run_check(
         std::process::exit(1);
     }
     Ok(())
+}
+
+/// Hidden unless the caller opts in and stderr is a real terminal, so
+/// `--json`, CI, and hook output stay free of bar/spinner control codes.
+fn progress_bar(file_count: usize, enabled: bool) -> ProgressBar {
+    if !enabled || !std::io::stderr().is_terminal() {
+        return ProgressBar::hidden();
+    }
+
+    let progress = ProgressBar::new(file_count as u64);
+    progress.set_style(
+        ProgressStyle::with_template(
+            "{spinner:.cyan} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}",
+        )
+        .expect("progress template is valid")
+        .progress_chars("=> "),
+    );
+    progress.set_message("files");
+    progress
 }
 
 /// Extracts and checks comment blocks in `source`. When `added_lines` is
