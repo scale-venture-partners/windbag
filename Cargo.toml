@@ -1,6 +1,6 @@
 [package]
 name = "windbag"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Anti-slop linter: catches comments that narrate a change instead of documenting the constraint that makes the current code correct"
 license = "MIT"
