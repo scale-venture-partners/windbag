@@ -223,8 +223,8 @@ fn run_check(
     Ok(())
 }
 
-/// Big project scans takes times and users has no idea if it's running or not.
-/// Adding a progress bar is good UX
+/// Hidden unless the caller opts in and stderr is a real terminal, so
+/// `--json`, CI, and hook output stay free of bar/spinner control codes.
 fn progress_bar(file_count: usize, enabled: bool) -> ProgressBar {
     if !enabled || !std::io::stderr().is_terminal() {
         return ProgressBar::hidden();

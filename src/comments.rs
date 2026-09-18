@@ -91,7 +91,8 @@ fn extract_treesitter_blocks(
         let (attached_code_lines, attached_code_text) =
             attached_sibling_info(source, &last_node, end_row);
         let text = texts.join("\n");
-        let is_doc_comment = language.is_doc_comment(&text);
+        let is_doc_comment = language.is_doc_comment(&text)
+            || (language == Language::Go && is_go_doc_target(&last_node, end_row));
         blocks.push(CommentBlock {
             start_line: start_row + 1,
             end_line: end_row + 1,
@@ -104,6 +105,26 @@ fn extract_treesitter_blocks(
         i = j;
     }
     Ok(blocks)
+}
+
+/// Go doc comments carry no marker like `///` or `/**`: a plain `//` block
+/// documents a declaration only by sitting directly above it, so the
+/// signal is adjacency to one of these top-level kinds, not comment text.
+fn is_go_doc_target(last_comment_node: &Node, end_row: usize) -> bool {
+    const DECLARATION_KINDS: &[&str] = &[
+        "function_declaration",
+        "method_declaration",
+        "type_declaration",
+        "const_declaration",
+        "var_declaration",
+        "package_clause",
+    ];
+    matches!(
+        last_comment_node.next_sibling(),
+        Some(sibling)
+            if sibling.start_position().row == end_row + 1
+                && DECLARATION_KINDS.contains(&sibling.kind())
+    )
 }
 
 fn node_text(source: &str, node: &Node) -> String {

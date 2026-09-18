@@ -54,7 +54,9 @@ impl Language {
     /// `///`/`//!`/`/**`/`/*!`), exempt from the verbose-comment length
     /// rule the same way Python docstrings are exempt (docstrings aren't
     /// `comment` nodes at all in tree-sitter's Python grammar, so they
-    /// never reach this check in the first place).
+    /// never reach this check in the first place). Go has no such prefix;
+    /// its doc comments are recognized structurally instead, by adjacency
+    /// to a declaration.
     pub fn is_doc_comment(&self, text: &str) -> bool {
         let trimmed = text.trim_start();
         match self {
