@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   check-version:
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-4x8
     steps:
       - uses: actions/checkout@v4
       - name: Check tag matches pyproject.toml version
@@ -23,7 +23,7 @@ jobs:
 
   linux:
     needs: check-version
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-4x8
     strategy:
       matrix:
         target: [x86_64, aarch64]
@@ -44,7 +44,7 @@ jobs:
 
   macos:
     needs: check-version
-    runs-on: macos-latest
+    runs-on: nscloud-macos-tahoe-arm64-6x14
     strategy:
       matrix:
         target: [x86_64, aarch64]
@@ -62,7 +62,7 @@ jobs:
 
   windows:
     needs: check-version
-    runs-on: windows-latest
+    runs-on: nscloud-windows-2022-amd64-4x8
     steps:
       - uses: actions/checkout@v4
       - uses: PyO3/maturin-action@v1
@@ -77,7 +77,7 @@ jobs:
 
   sdist:
     needs: check-version
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-4x8
     steps:
       - uses: actions/checkout@v4
       - uses: PyO3/maturin-action@v1
@@ -92,7 +92,7 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: [linux, macos, windows, sdist]
-    runs-on: ubuntu-latest
+    runs-on: nscloud-ubuntu-24.04-amd64-4x8
     environment: pypi
     permissions:
       id-token: write
