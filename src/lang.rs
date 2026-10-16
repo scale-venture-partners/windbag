@@ -13,6 +13,8 @@ pub enum Language {
     Sql,
     Go,
     Java,
+    C,
+    Cpp,
 }
 
 impl Language {
@@ -29,6 +31,10 @@ impl Language {
             Some("sql") => Some(Language::Sql),
             Some("go") => Some(Language::Go),
             Some("java") => Some(Language::Java),
+            Some("c") => Some(Language::C),
+            Some("h") | Some("cc") | Some("cpp") | Some("cxx") | Some("hpp") | Some("hxx")
+            | Some("hh") | Some("ipp") | Some("tpp") | Some("inl") | Some("cppm") | Some("ixx")
+            | Some("c++") | Some("h++") | Some("C") | Some("H") => Some(Language::Cpp),
             _ => None,
         }
     }
@@ -47,13 +53,16 @@ impl Language {
             Language::Markdown | Language::Sql => None,
             Language::Go => Some(tree_sitter_go::LANGUAGE.into()),
             Language::Java => Some(tree_sitter_java::LANGUAGE.into()),
+            Language::C => Some(tree_sitter_c::LANGUAGE.into()),
+            Language::Cpp => Some(tree_sitter_cpp::LANGUAGE.into()),
         }
     }
 
-    /// Comment-block prefixes that mark real documentation (JSDoc/Javadoc, Rust's
-    /// `///`/`//!`/`/**`/`/*!`). A divider or spacer that merely opens with
-    /// those characters (`////`, `/***`, `/**/`) documents nothing, so it is
-    /// carved out. The prefixes are exempt from the verbose-comment length
+    /// Comment-block prefixes that mark real documentation
+    /// (JSDoc/Javadoc/Doxygen, Rust's `///`/`//!`/`/**`/`/*!`). A divider or
+    /// spacer that merely opens with those characters (`////`, `/***`, `/**/`)
+    /// documents nothing, so it is carved out. The prefixes are exempt from
+    /// the verbose-comment length
     /// rule the same way Python docstrings are exempt (docstrings aren't
     /// `comment` nodes at all in tree-sitter's Python grammar, so they
     /// never reach this check in the first place). Go has no such prefix;
@@ -67,7 +76,7 @@ impl Language {
                     && !trimmed.starts_with("/***")
                     && !trimmed.starts_with("/**/")
             }
-            Language::Rust => {
+            Language::Rust | Language::C | Language::Cpp => {
                 (trimmed.starts_with("///") && !trimmed.starts_with("////"))
                     || trimmed.starts_with("//!")
                     || (trimmed.starts_with("/**")

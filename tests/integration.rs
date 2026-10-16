@@ -550,6 +550,218 @@ fn javadoc_is_exempt_from_verbose_comment_but_not_content_rules() {
     assert!(!rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
 }
 
+#[test]
+fn c_and_cpp_extensions_map_to_their_languages() {
+    assert_eq!(
+        Language::from_path(Path::new("kernel/net.c")),
+        Some(Language::C)
+    );
+    assert_eq!(
+        Language::from_path(Path::new("engine/render.cpp")),
+        Some(Language::Cpp)
+    );
+    assert_eq!(
+        Language::from_path(Path::new("include/api.h")),
+        Some(Language::Cpp)
+    );
+    assert_eq!(
+        Language::from_path(Path::new("legacy/Matrix.C")),
+        Some(Language::Cpp)
+    );
+    assert_eq!(
+        Language::from_path(Path::new("legacy/Matrix.H")),
+        Some(Language::Cpp)
+    );
+    for path in ["a.cc", "a.hpp", "a.cxx", "a.c++"] {
+        assert_eq!(Language::from_path(Path::new(path)), Some(Language::Cpp));
+    }
+}
+
+#[test]
+fn preproc_trailing_line_comments_are_checked() {
+    let source = "\
+#define MAX 10 // Was missing entirely (SCA-705).
+#pragma once // Was missing entirely (SCA-706).
+int x;
+";
+    for language in [Language::C, Language::Cpp] {
+        let rules: Vec<&str> = violations_for(source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+        assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+    }
+}
+
+#[test]
+fn preproc_apostrophes_do_not_hide_trailing_comments() {
+    for source in [
+        "#define BIG 1'000 // Was missing entirely (SCA-705).\nint x;\n",
+        "#error don't build this // Was missing entirely (SCA-705).\nint x;\n",
+        "#define Q 'a' // Was missing entirely (SCA-705).\nint x;\n",
+        "#define SLASH L'/' // Was missing entirely (SCA-705).\nint x;\n",
+        "#define SLASH u8'/' // Was missing entirely (SCA-705).\nint x;\n",
+    ] {
+        for language in [Language::C, Language::Cpp] {
+            let rules: Vec<&str> = violations_for(source, language)
+                .iter()
+                .map(|violation| violation.rule)
+                .collect();
+            assert!(rules.contains(&"TICKET_ID"), "{source:?}: got {rules:?}");
+        }
+    }
+}
+
+#[test]
+fn preproc_trailing_doxygen_comment_is_doc_comment() {
+    let source = "#define MAX 256 ///< Max length.\nint x;\n";
+    for language in [Language::C, Language::Cpp] {
+        let blocks = extract_blocks(source, language).unwrap();
+        assert_eq!(blocks.len(), 1, "got {blocks:#?}");
+        assert!(blocks[0].is_doc_comment, "got {blocks:#?}");
+    }
+}
+
+#[test]
+fn preproc_string_literals_are_not_comments() {
+    let source = "#define URL \"http://example.com//assets\"\nint x;\n";
+    for language in [Language::C, Language::Cpp] {
+        let violations = violations_for(source, language);
+        assert!(violations.is_empty(), "got {violations:#?}");
+    }
+}
+
+#[test]
+fn every_doxygen_marker_is_exempt_from_verbose_comment() {
+    for source in [
+        "/// Was missing entirely (SCA-707).\n/// Documents the public API.\n/// Spans three full lines.\nvoid f();",
+        "//! Was missing entirely (SCA-707).\n//! Documents the public API.\n//! Spans three full lines.\nvoid f();",
+        "/*!\n * Was missing entirely (SCA-707).\n * Documents the public API.\n */\nvoid f();",
+    ] {
+        let rules: Vec<&str> = violations_for(source, Language::Cpp)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(rules.contains(&"TICKET_ID"), "got {rules:?} for {source:?}");
+        assert!(
+            !rules.contains(&"VERBOSE_COMMENT"),
+            "got {rules:?} for {source:?}"
+        );
+    }
+}
+
+#[test]
+fn c_and_cpp_comments_are_checked() {
+    for (language, source) in [
+        (Language::C, include_str!("fixtures/slop.c")),
+        (Language::Cpp, include_str!("fixtures/slop.cpp")),
+    ] {
+        let rules: Vec<&str> = violations_for(source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+        assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+        assert!(rules.contains(&"CROSS_FILE_REF"), "got {rules:?}");
+    }
+}
+
+#[test]
+fn doxygen_is_exempt_from_verbose_comment_but_not_content_rules() {
+    let source = include_str!("fixtures/doxygen_slop.cpp");
+    let rules: Vec<&str> = violations_for(source, Language::Cpp)
+        .iter()
+        .map(|violation| violation.rule)
+        .collect();
+    assert!(rules.contains(&"TICKET_ID"), "got {rules:?}");
+    assert!(rules.contains(&"HISTORY_NARRATION"), "got {rules:?}");
+    assert!(!rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
+}
+
+#[test]
+fn cross_file_ref_requires_the_whole_extension() {
+    for (language, source) in [
+        (
+            Language::Cpp,
+            "// warm self.cache before the first request\nint x;",
+        ),
+        (Language::Cpp, "// this.handler() owns retry logic\nint x;"),
+    ] {
+        let rules: Vec<&str> = violations_for(source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            !rules.contains(&"CROSS_FILE_REF"),
+            "got {rules:?} for {source:?}"
+        );
+    }
+}
+
+#[test]
+fn single_letter_refs_need_a_path_or_line_number() {
+    for source in [
+        "// this.h is the cached height\nint x;",
+        "// rect.h tracks the clip height\nint x;",
+        "// self.c counts retries\nint x;",
+        "// see main.c\nint x;",
+    ] {
+        let rules: Vec<&str> = violations_for(source, Language::Cpp)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            !rules.contains(&"CROSS_FILE_REF"),
+            "got {rules:?} for {source:?}"
+        );
+    }
+    for source in ["// see src/list.h\nint x;", "// see vec.c:41\nint x;"] {
+        let rules: Vec<&str> = violations_for(source, Language::Cpp)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            rules.contains(&"CROSS_FILE_REF"),
+            "got {rules:?} for {source:?}"
+        );
+    }
+}
+
+#[test]
+fn plain_c_comment_blocks_are_not_doc_exempt() {
+    let source = "\
+// Validates header fields against the spec table.
+// Rejects unknown versions and truncated payloads.
+// Rejects checksum mismatches.
+void validate(void) {}
+";
+    for language in [Language::C, Language::Cpp] {
+        let rules: Vec<&str> = violations_for(source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(rules.contains(&"VERBOSE_COMMENT"), "got {rules:?}");
+    }
+}
+
+#[test]
+fn cross_file_ref_matches_the_plusplus_extensions() {
+    for source in [
+        "// see legacy/widget.c++:12\nint x;",
+        "// see legacy/widget.h++:12\nint x;",
+    ] {
+        let rules: Vec<&str> = violations_for(source, Language::Cpp)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            rules.contains(&"CROSS_FILE_REF"),
+            "got {rules:?} for {source:?}"
+        );
+    }
+}
+
 /// Go has no doc-comment marker: a `//` block above a declaration is
 /// documentation by position, matching Rust's `///` exemption.
 #[test]
@@ -738,6 +950,183 @@ fn sql_multiline_block_comment_merges_with_an_adjacent_line_comment() {
 }
 
 #[test]
+fn preproc_bare_urls_are_not_comments() {
+    for source in [
+        "#error see http://example.com this should work\nint x;\n",
+        "#pragma message see http://example.com/a//b not sure why\nint x;\n",
+    ] {
+        for language in [Language::C, Language::Cpp] {
+            let violations = violations_for(source, language);
+            assert!(violations.is_empty(), "{source:?}: got {violations:#?}");
+        }
+    }
+}
+
+#[test]
+fn preproc_raw_strings_are_not_comments() {
+    for source in [
+        "#define Q R\"(a \"b // this should work)\"\nint x;\n",
+        "#define Q R\"tag(not sure why // hopefully)tag\"\nint x;\n",
+    ] {
+        let violations = violations_for(source, Language::Cpp);
+        assert!(violations.is_empty(), "{source:?}: got {violations:#?}");
+    }
+}
+
+#[test]
+fn preproc_an_identifier_ending_in_r_is_not_a_raw_string() {
+    for source in [
+        "#define FULL DIR\"/file.txt\" // Was missing entirely (SCA-705).\nint x;\n",
+        "#define VER MAJOR\".\"MINOR // Was missing entirely (SCA-705).\nint x;\n",
+        "#define M ERROR\"x\" f(1) // Was missing entirely (SCA-705).\nint x;\n",
+    ] {
+        for language in [Language::C, Language::Cpp] {
+            let rules: Vec<&str> = violations_for(source, language)
+                .iter()
+                .map(|violation| violation.rule)
+                .collect();
+            assert!(rules.contains(&"TICKET_ID"), "{source:?}: got {rules:?}");
+        }
+    }
+}
+
+#[test]
+fn preproc_a_lone_apostrophe_does_not_hide_a_comment() {
+    for source in [
+        "#error cant parse ' // Was missing entirely (SCA-705).\nint x;\n",
+        "#error unknown 'mode // it's unset (SCA-705).\nint x;\n",
+    ] {
+        for language in [Language::C, Language::Cpp] {
+            let rules: Vec<&str> = violations_for(source, language)
+                .iter()
+                .map(|violation| violation.rule)
+                .collect();
+            assert!(rules.contains(&"TICKET_ID"), "{source:?}: got {rules:?}");
+        }
+    }
+}
+
+#[test]
+fn a_one_line_directive_is_one_attached_code_line() {
+    let comment = "\
+// Validates the header.
+// Rejects bad versions.
+// Rejects bad checksums.
+// Rejects short payloads.
+";
+    for code in ["#define MAX 10\n", "int max = 10;\n"] {
+        let source = format!("{comment}{code}");
+        for language in [Language::C, Language::Cpp] {
+            let rules: Vec<&str> = violations_for(&source, language)
+                .iter()
+                .map(|violation| violation.rule)
+                .collect();
+            assert!(
+                rules.contains(&"VERBOSE_COMMENT"),
+                "{code:?}: got {rules:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn banner_dividers_are_not_doc_comments() {
+    let slash_banner = "\
+////////////////////////
+// Validates the header.
+// Rejects bad versions.
+// Rejects bad checksums.
+";
+    let star_banner = "\
+/***********************
+ * Validates the header.
+ * Rejects bad versions.
+ * Rejects bad checksums.
+ */
+";
+    let spacer = "\
+/**/
+// Validates the header.
+// Rejects bad versions.
+// Rejects bad checksums.
+";
+    let cases = [
+        (Language::C, format!("{spacer}void validate(void) {{}}\n")),
+        (Language::Cpp, format!("{spacer}void validate() {{}}\n")),
+        (Language::Rust, format!("{spacer}fn validate() {{}}\n")),
+        (
+            Language::JavaScript,
+            format!("{spacer}function validate() {{}}\n"),
+        ),
+        (
+            Language::TypeScript,
+            format!("{spacer}function validate() {{}}\n"),
+        ),
+        (
+            Language::Java,
+            format!("class A {{\n{spacer}void validate() {{}}\n}}\n"),
+        ),
+        (
+            Language::C,
+            format!("{slash_banner}void validate(void) {{}}\n"),
+        ),
+        (
+            Language::C,
+            format!("{star_banner}void validate(void) {{}}\n"),
+        ),
+        (
+            Language::Cpp,
+            format!("{slash_banner}void validate() {{}}\n"),
+        ),
+        (
+            Language::Cpp,
+            format!("{star_banner}void validate() {{}}\n"),
+        ),
+        (
+            Language::Rust,
+            format!("{slash_banner}fn validate() {{}}\n"),
+        ),
+        (Language::Rust, format!("{star_banner}fn validate() {{}}\n")),
+        (
+            Language::JavaScript,
+            format!("{star_banner}function validate() {{}}\n"),
+        ),
+        (
+            Language::TypeScript,
+            format!("{star_banner}function validate() {{}}\n"),
+        ),
+        (
+            Language::Java,
+            format!("class A {{\n{star_banner}void validate() {{}}\n}}\n"),
+        ),
+    ];
+    for (language, source) in cases {
+        let rules: Vec<&str> = violations_for(&source, language)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            rules.contains(&"VERBOSE_COMMENT"),
+            "{language:?} {source:?}: got {rules:?}"
+        );
+    }
+}
+
+#[test]
+fn cross_file_ref_matches_a_symbol_suffix() {
+    for source in ["// see foo.h::parse\nint x;", "// see vec.c::push\nint x;"] {
+        let rules: Vec<&str> = violations_for(source, Language::C)
+            .iter()
+            .map(|violation| violation.rule)
+            .collect();
+        assert!(
+            rules.contains(&"CROSS_FILE_REF"),
+            "{source:?}: got {rules:?}"
+        );
+    }
+}
+
+#[test]
 fn cross_file_ref_needs_the_whole_extension() {
     for source in [
         "# see foo.pyi for the stubs\nx = 1\n",
@@ -825,71 +1214,6 @@ fn sql_hash_comments_cli_respects_config() {
             String::from_utf8_lossy(&output.stderr)
         );
         assert_eq!(stdout.contains("TICKET_ID"), enabled, "{stdout}");
-    }
-}
-
-#[test]
-fn banner_dividers_are_not_doc_comments() {
-    let slash_banner = "\
-////////////////////////
-// Validates the header.
-// Rejects bad versions.
-// Rejects bad checksums.
-";
-    let star_banner = "\
-/***********************
- * Validates the header.
- * Rejects bad versions.
- * Rejects bad checksums.
- */
-";
-    let spacer = "\
-/**/
-// Validates the header.
-// Rejects bad versions.
-// Rejects bad checksums.
-";
-    let cases = [
-        (Language::Rust, format!("{spacer}fn validate() {{}}\n")),
-        (
-            Language::JavaScript,
-            format!("{spacer}function validate() {{}}\n"),
-        ),
-        (
-            Language::TypeScript,
-            format!("{spacer}function validate() {{}}\n"),
-        ),
-        (
-            Language::Java,
-            format!("class A {{\n{spacer}void validate() {{}}\n}}\n"),
-        ),
-        (
-            Language::Rust,
-            format!("{slash_banner}fn validate() {{}}\n"),
-        ),
-        (Language::Rust, format!("{star_banner}fn validate() {{}}\n")),
-        (
-            Language::JavaScript,
-            format!("{star_banner}function validate() {{}}\n"),
-        ),
-        (
-            Language::TypeScript,
-            format!("{star_banner}function validate() {{}}\n"),
-        ),
-        (
-            Language::Java,
-            format!("class A {{\n{star_banner}void validate() {{}}\n}}\n"),
-        ),
-    ];
-    for (language, source) in cases {
-        let rules: Vec<&str> = violations_for(&source, language)
-            .iter()
-            .map(|violation| violation.rule)
-            .collect();
-        assert!(
-            rules.contains(&"VERBOSE_COMMENT"),
-            "{language:?} {source:?}: got {rules:?}"
-        );
     }
 }
 

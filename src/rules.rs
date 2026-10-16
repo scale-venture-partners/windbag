@@ -190,12 +190,19 @@ fn hedge_language_rule(file: &str, block: &CommentBlock, config: &Config) -> Opt
 fn cross_file_ref_rule(file: &str, block: &CommentBlock) -> Option<Violation> {
     let re =
         Regex::new(
-            r"[A-Za-z0-9_./-]+\.(?:tfvars|yaml|html|java|jsx|tsx|hcl|htm|yml|py|tf|ts|js|rs|md|go)\b(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?",
+            // Every extension ends in `\b`, so a short one cannot truncate a
+            // longer path; `c++`/`h++` cannot, so they stay ahead of `c`/`h`.
+            r"[A-Za-z0-9_./-]+\.(c\+\+|h\+\+|(?:tfvars|yaml|html|java|cppm|jsx|tsx|hcl|htm|yml|cpp|cxx|ipp|tpp|inl|ixx|hpp|hxx|py|tf|ts|js|rs|md|go|cc|hh|c|h)\b)(:\d+)?(::[A-Za-z_][A-Za-z0-9_]*)?",
         )
             .unwrap();
-    let m = re
-        .find_iter(&block.text)
-        .find(|m| !is_inside_url(&block.text, m.start()))?;
+    let m = re.captures_iter(&block.text).find_map(|caps| {
+        let m = caps.get(0)?;
+        let anchored = !matches!(&caps[1], "c" | "h")
+            || m.as_str().contains('/')
+            || caps.get(2).is_some()
+            || caps.get(3).is_some();
+        (anchored && !is_inside_url(&block.text, m.start())).then_some(m)
+    })?;
 
     Some(Violation {
         file: file.to_string(),

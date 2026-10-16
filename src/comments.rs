@@ -37,6 +37,101 @@ fn collect_comment_nodes<'a>(node: Node<'a>, out: &mut Vec<Node<'a>>) {
     }
 }
 
+fn collect_preproc_arg_nodes<'a>(node: Node<'a>, out: &mut Vec<Node<'a>>) {
+    if node.kind() == "preproc_arg" {
+        out.push(node);
+        return;
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_preproc_arg_nodes(child, out);
+    }
+}
+
+fn trailing_line_comment_offset(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut in_string = false;
+    let mut in_char = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' if in_string || in_char => i += 1,
+            b'"' if !in_string && !in_char && opens_raw_string(bytes, i) => {
+                i = raw_string_end(bytes, i)?;
+            }
+            b'"' if !in_char => in_string = !in_string,
+            b'\''
+                if !in_string
+                    && (in_char
+                        || (opens_char_literal(bytes, i) && closes_char_literal(bytes, i))) =>
+            {
+                in_char = !in_char
+            }
+            b':' if !in_string
+                && !in_char
+                && bytes.get(i + 1) == Some(&b'/')
+                && bytes.get(i + 2) == Some(&b'/') =>
+            {
+                while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                    i += 1;
+                }
+            }
+            b'/' if !in_string && !in_char && bytes.get(i + 1) == Some(&b'/') => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// A `'` right after an identifier character is an apostrophe in
+/// `#error`/`#pragma message` prose (`don't`) or a digit separator
+/// (`1'000`), not a char literal, unless that identifier is an encoding
+/// prefix (`L'/'`, `u8'a'`).
+fn opens_char_literal(bytes: &[u8], quote: usize) -> bool {
+    let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+    let start = bytes[..quote]
+        .iter()
+        .rposition(|&b| !is_ident(b))
+        .map_or(0, |p| p + 1);
+    matches!(&bytes[start..quote], b"" | b"L" | b"u" | b"U" | b"u8")
+}
+
+fn closes_char_literal(bytes: &[u8], quote: usize) -> bool {
+    let mut i = quote + 1;
+    while let Some(&b) = bytes.get(i) {
+        match b {
+            b'\\' => i += 1,
+            b'\n' => return false,
+            b'/' if bytes.get(i + 1) == Some(&b'/') => return false,
+            b'\'' => return true,
+            _ => {}
+        }
+        i += 1;
+    }
+    false
+}
+
+fn opens_raw_string(bytes: &[u8], quote: usize) -> bool {
+    let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+    let start = bytes[..quote]
+        .iter()
+        .rposition(|&b| !is_ident(b))
+        .map_or(0, |p| p + 1);
+    matches!(&bytes[start..quote], b"R" | b"LR" | b"uR" | b"UR" | b"u8R")
+}
+
+fn raw_string_end(bytes: &[u8], quote: usize) -> Option<usize> {
+    let open = quote + 1 + bytes[quote + 1..].iter().position(|&b| b == b'(')?;
+    let mut close = vec![b')'];
+    close.extend_from_slice(&bytes[quote + 1..open]);
+    close.push(b'"');
+    bytes[open..]
+        .windows(close.len())
+        .position(|w| w == close.as_slice())
+        .map(|p| open + p + close.len() - 1)
+}
+
 /// Extracts comment blocks from `source`. Consecutive comments (no blank
 /// or code line between them) are merged into a single block, matching how
 /// a human reads a paragraph-style comment as one unit.
@@ -116,6 +211,27 @@ fn extract_treesitter_blocks(
         });
         i = j;
     }
+    if matches!(language, Language::C | Language::Cpp) {
+        let mut args = Vec::new();
+        collect_preproc_arg_nodes(tree.root_node(), &mut args);
+        for arg in args {
+            let text = node_text(source, &arg);
+            if let Some(offset) = trailing_line_comment_offset(&text) {
+                let start_row = arg.start_position().row + text[..offset].matches('\n').count();
+                let comment = &text[offset..];
+                blocks.push(CommentBlock {
+                    start_line: start_row + 1,
+                    end_line: arg.end_position().row + 1,
+                    text: comment.to_string(),
+                    attached_code_lines: 0,
+                    attached_code_text: None,
+                    is_doc_comment: language.is_doc_comment(comment),
+                    is_markup: false,
+                });
+            }
+        }
+        blocks.sort_by_key(|b| b.start_line);
+    }
     Ok(blocks)
 }
 
@@ -150,7 +266,13 @@ fn attached_sibling_info(
 ) -> (usize, Option<String>) {
     match last_comment_node.next_sibling() {
         Some(sibling) if sibling.start_position().row == end_row + 1 => {
-            let span = sibling.end_position().row - sibling.start_position().row + 1;
+            let end = sibling.end_position();
+            let end_row = if end.column == 0 && end.row > sibling.start_position().row {
+                end.row - 1
+            } else {
+                end.row
+            };
+            let span = end_row - sibling.start_position().row + 1;
             (span, Some(node_text(source, &sibling)))
         }
         _ => (0, None),
