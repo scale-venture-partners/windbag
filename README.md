@@ -117,7 +117,7 @@ Pre-commit:
       entry: windbag check --staged
       language: system
       pass_filenames: false
-      types_or: [python, javascript, jsx, ts, tsx, terraform, rust, yaml, markdown, html, sql, go, java, c, c++]
+      types_or: [python, javascript, jsx, ts, tsx, terraform, hcl, rust, yaml, markdown, html, sql, go, java, c, c++]
 ```
 
 (`windbag` needs to already be on `PATH` — `language: system` doesn't install it for you.)
